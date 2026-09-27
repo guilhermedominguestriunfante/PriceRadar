@@ -38,13 +38,19 @@ enum class ZoneType(val multiplier: Float) {
     ;
 
     val isMultiplier: Boolean get() = this == X2 || this == X3 || this == X5
-    /** Zones that disappear after a limited number of hits. */
+    /**
+     * Charges: a zone pops after this many hits. Makes zones short bursts to chase rather than a
+     * permanent multiplier, so speed stays the core skill and precision is a bonus.
+     */
     val maxHits: Int
         get() = when (this) {
+            X2 -> 12
+            X3 -> 10
+            X5 -> 6
+            COIN -> 8
+            COMBO -> 10
             TIME, GOLDEN -> 1
             CRITICAL -> 3
-            COIN -> 8
-            else -> Int.MAX_VALUE
         }
 }
 

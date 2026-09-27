@@ -40,7 +40,7 @@ object GameBalance {
     const val ZONE_HIT_TOLERANCE = 1.12f
     const val PERFECT_RADIUS_FRACTION = 0.30f
     const val PERFECT_RADIUS_PER_CRIT_LEVEL = 0.03f
-    const val PERFECT_BONUS_TAPS = 5
+    const val PERFECT_BONUS_TAPS = 2
     const val PERFECT_BONUS_PER_CRIT_LEVEL = 0.15f
     const val PERFECTS_PER_COIN = 4
     const val ZONE_MULT_PER_BOOST_LEVEL = 0.10f

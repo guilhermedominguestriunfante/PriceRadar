@@ -32,25 +32,38 @@ object StageCatalog {
     }
 
     // ---- expected-player model used to size targets and stars -------------------------------
+    //
+    // Calibrated from BotPlayer simulations (core/src/test/.../balance): the "average" profile
+    // (7 TAP/s, 270 ms reactions, aims at zones about half the time) with the upgrades a typical
+    // player owns at that point. Re-run CalibrationReport after changing gameplay numbers.
 
-    /** Physical taps per second an average improving player sustains around stage [n]. */
-    fun expectedTps(n: Int): Float = 5.0f + 2.6f * (1f - exp(-(n - 1) / 15f))
+    /** Physical valid touches per match of an average player. */
+    fun expectedTouches(n: Int): Float = when {
+        n <= 5 -> 414f
+        n <= 10 -> 372f
+        else -> max(275f, 300f - (n - 11) * 0.45f)
+    }
 
     /** Tap value we assume the player owns by stage [n] (DOUBLE TAP is cheap, TRIPLE is late). */
-    fun expectedTapValue(n: Int): Float = when {
-        n < 8 -> 1f
-        n < 35 -> 1.5f
-        else -> 2.2f
+    fun expectedTapValue(n: Int): Int = when {
+        n < 8 -> 1
+        n < 35 -> 2
+        else -> 3
     }
 
-    /** Average multiplier (combo, zones, frenzy) for a decent run. */
-    fun expectedMultiplier(n: Int): Float = 1.45f + 1.7f * (1f - exp(-(n - 1) / 12f))
-
-    fun expectedScore(n: Int): Int {
-        val interruptLoss = if (n >= 6) min(0.12f, 0.04f + n * 0.002f) else 0f
-        val touches = 58f * expectedTps(n) * (1f - interruptLoss)
-        return roundTo(touches * expectedTapValue(n) * expectedMultiplier(n), 10)
+    /** Average points per TAP (combo tiers, frenzy, zones, perfects) for a decent run. */
+    fun expectedMultiplier(n: Int): Float = when {
+        n <= 3 -> 3.4f
+        n <= 5 -> 4.1f
+        n <= 10 -> 3.8f
+        n <= 30 -> 10.4f + (n - 11) * 0.27f
+        else -> 15.3f + (n - 30) * 0.1f
     }
+
+    fun expectedScore(n: Int): Int = roundTo(expectedTouches(n) * expectedTapValue(n) * expectedMultiplier(n), 10)
+
+    /** Average player's physical taps per second (for daily challenge sizing). */
+    fun expectedTps(n: Int): Float = expectedTouches(n) / 58f
 
     // ---- building blocks ------------------------------------------------------------------------
 
@@ -102,19 +115,19 @@ object StageCatalog {
         val k = max(0, n - 30)
         return when {
             n <= 20 -> ZoneConfig(
-                spawnMinMs = 1_600, spawnMaxMs = 2_600, maxConcurrent = if (n >= 15 || boss) 2 else 1,
+                spawnMinMs = 3_200, spawnMaxMs = 5_000, maxConcurrent = if (n >= 15 || boss) 2 else 1,
                 lifeMinMs = 3_000, lifeMaxMs = 4_500, weights = weights,
                 radiusScale = if (n < 13) 1.1f else 1f, goldenChance = if (n >= 12) 0.006f else 0f,
             )
             n <= 30 -> ZoneConfig(
-                spawnMinMs = 1_300, spawnMaxMs = 2_300, maxConcurrent = if (boss) 3 else 2,
+                spawnMinMs = 2_800, spawnMaxMs = 4_400, maxConcurrent = if (boss) 3 else 2,
                 lifeMinMs = 2_600, lifeMaxMs = 4_000, weights = weights,
                 driftChance = 0.35f, orbitChance = if (n >= 25) 0.15f else 0f,
                 teleportChance = if (n >= 27) 0.1f else 0f, shrinkChance = 0.2f,
                 lockChance = if (n >= 23) 0.15f else 0f, goldenChance = 0.006f, speed = 0.18f,
             )
             else -> ZoneConfig(
-                spawnMinMs = max(900L, 1_200L - k * 6L), spawnMaxMs = max(1_600L, 2_100L - k * 8L),
+                spawnMinMs = max(2_000L, 2_600L - k * 10L), spawnMaxMs = max(3_400L, 4_200L - k * 12L),
                 maxConcurrent = if (boss) 3 else 2 + (k / 20).coerceAtMost(1),
                 lifeMinMs = max(1_800L, 2_400L - k * 8L), lifeMaxMs = max(2_800L, 3_800L - k * 10L),
                 weights = weights, radiusScale = max(0.8f, 1f - k * 0.004f),
@@ -143,18 +156,12 @@ object StageCatalog {
         val boss = type == StageType.BOSS
         val expected = expectedScore(n)
         val scoreTarget = when (type) {
-            StageType.SCORE -> target
-            StageType.BOSS -> target
-            else -> roundTo(expected * 0.75f, 10)
+            StageType.SCORE, StageType.BOSS -> target
+            else -> roundTo(expected * 0.7f, 10)
         }
-        val star2 = when (type) {
-            StageType.SCORE, StageType.BOSS -> roundTo(target * 1.25f, 10)
-            else -> roundTo(expected * 0.95f, 10)
-        }
-        val star3 = when (type) {
-            StageType.SCORE, StageType.BOSS -> roundTo(target * 1.6f, 10)
-            else -> roundTo(expected * 1.35f, 10)
-        }
+        // Two stars around an average run, three stars need a skilled one (≈ 0.9 × skilled mean).
+        val star2 = max(roundTo(expected * 1.0f, 10), if (type == StageType.SCORE || type == StageType.BOSS) roundTo(target * 1.2f, 10) else 0)
+        val star3 = max(roundTo(expected * 1.35f, 10), star2 + 10)
         val stop = stopFor(n, boss)
         val lives = when {
             type == StageType.SURVIVAL -> target + 1
@@ -182,41 +189,55 @@ object StageCatalog {
     }
 
     private fun speedTarget(n: Int): Int {
-        val loss = if (n >= 6) 0.1f else 0f
-        return roundTo(56f * expectedTps(n) * expectedTapValue(n) * (1f - loss) * 0.82f, 10)
+        val share = when {
+            n <= 5 -> 0.68f
+            n <= 10 -> 0.72f
+            n <= 30 -> 0.8f
+            else -> 0.82f
+        }
+        return roundTo(expectedTouches(n) * expectedTapValue(n) * share, 10)
+    }
+
+    private fun scoreTarget(n: Int): Int {
+        val share = when {
+            n <= 10 -> 0.62f
+            n <= 30 -> 0.62f
+            else -> 0.68f
+        }
+        return roundTo(expectedScore(n) * share, 10)
     }
 
     private fun handcrafted(n: Int): StageConfig = when (n) {
-        1 -> build(1, StageType.SPEED, 120, Mechanic.TAP)
-        2 -> build(2, StageType.COMBO, 40, Mechanic.COMBO)
-        3 -> build(3, StageType.SCORE, roundTo(expectedScore(3) * 0.7f, 10), Mechanic.COINS)
+        1 -> build(1, StageType.SPEED, 150, Mechanic.TAP)
+        2 -> build(2, StageType.COMBO, 60, Mechanic.COMBO)
+        3 -> build(3, StageType.SCORE, scoreTarget(3), Mechanic.COINS)
         4 -> build(4, StageType.FRENZY, 1, Mechanic.FRENZY)
         5 -> build(5, StageType.SPEED, speedTarget(5))
         6 -> build(6, StageType.SURVIVAL, 1, Mechanic.STOP)
-        7 -> build(7, StageType.SCORE, roundTo(expectedScore(7) * 0.72f, 10))
-        8 -> build(8, StageType.COMBO, 80)
+        7 -> build(7, StageType.SCORE, scoreTarget(7))
+        8 -> build(8, StageType.COMBO, 200)
         9 -> build(9, StageType.SPEED, speedTarget(9))
-        10 -> build(10, StageType.BOSS, roundTo(expectedScore(10) * 0.72f, 10), Mechanic.BOSS)
-        11 -> build(11, StageType.PRECISION, 35, Mechanic.HOT_ZONES)
-        12 -> build(12, StageType.SCORE, roundTo(expectedScore(12) * 0.72f, 10))
-        13 -> build(13, StageType.PERFECT, 10, Mechanic.PERFECT)
-        14 -> build(14, StageType.COMBO, 150)
+        10 -> build(10, StageType.BOSS, roundTo(expectedScore(10) * 0.62f, 10), Mechanic.BOSS)
+        11 -> build(11, StageType.PRECISION, 50, Mechanic.HOT_ZONES)
+        12 -> build(12, StageType.SCORE, scoreTarget(12))
+        13 -> build(13, StageType.PERFECT, 15, Mechanic.PERFECT)
+        14 -> build(14, StageType.COMBO, 330)
         15 -> build(15, StageType.SURVIVAL, 1)
-        16 -> build(16, StageType.SCORE, roundTo(expectedScore(16) * 0.74f, 10), Mechanic.REFLEX)
+        16 -> build(16, StageType.SCORE, scoreTarget(16), Mechanic.REFLEX)
         17 -> build(17, StageType.SPEED, speedTarget(17), Mechanic.SPECIAL_ZONES)
-        18 -> build(18, StageType.PRECISION, 60)
+        18 -> build(18, StageType.PRECISION, 70)
         19 -> build(19, StageType.FRENZY, 3)
-        20 -> build(20, StageType.BOSS, roundTo(expectedScore(20) * 0.74f, 10))
-        21 -> build(21, StageType.COMBO, 200, Mechanic.MOVING_ZONES)
-        22 -> build(22, StageType.SCORE, roundTo(expectedScore(22) * 0.75f, 10))
-        23 -> build(23, StageType.PRECISION, 75, Mechanic.LOCK_ZONES)
+        20 -> build(20, StageType.BOSS, roundTo(expectedScore(20) * 0.66f, 10))
+        21 -> build(21, StageType.COMBO, 350, Mechanic.MOVING_ZONES)
+        22 -> build(22, StageType.SCORE, scoreTarget(22))
+        23 -> build(23, StageType.PRECISION, 80, Mechanic.LOCK_ZONES)
         24 -> build(24, StageType.SURVIVAL, 0, Mechanic.FAKE_STOP)
-        25 -> build(25, StageType.PERFECT, 20, Mechanic.CRITICAL_ZONES)
+        25 -> build(25, StageType.PERFECT, 25, Mechanic.CRITICAL_ZONES)
         26 -> build(26, StageType.SPEED, speedTarget(26))
-        27 -> build(27, StageType.SCORE, roundTo(expectedScore(27) * 0.76f, 10))
-        28 -> build(28, StageType.COMBO, 280)
+        27 -> build(27, StageType.SCORE, scoreTarget(27))
+        28 -> build(28, StageType.COMBO, 360)
         29 -> build(29, StageType.FRENZY, 4)
-        else -> build(30, StageType.BOSS, roundTo(expectedScore(30) * 0.76f, 10))
+        else -> build(30, StageType.BOSS, roundTo(expectedScore(30) * 0.68f, 10))
     }
 
     private val PROCEDURAL_CYCLE = arrayOf(
@@ -225,21 +246,21 @@ object StageCatalog {
     )
 
     private fun procedural(n: Int): StageConfig {
-        if (isBoss(n)) return build(n, StageType.BOSS, roundTo(expectedScore(n) * 0.78f, 10))
+        if (isBoss(n)) return build(n, StageType.BOSS, roundTo(expectedScore(n) * 0.7f, 10))
         val k = n - 30
         // Rotate objectives with a seeded offset per block so blocks don't repeat identically.
         val block = (n - 1) / BOSS_EVERY
         val offset = Rng(Rng.mix(0xB10CL, block.toLong())).nextInt(PROCEDURAL_CYCLE.size)
         val type = PROCEDURAL_CYCLE[((n - 1) % BOSS_EVERY + offset) % PROCEDURAL_CYCLE.size]
         val target = when (type) {
-            StageType.SCORE -> roundTo(expectedScore(n) * 0.78f, 10)
+            StageType.SCORE -> scoreTarget(n)
             StageType.SPEED -> speedTarget(n)
-            StageType.COMBO -> min(600, 280 + k * 6)
-            StageType.PRECISION -> min(160, 75 + k * 2)
+            StageType.COMBO -> min(600, 340 + k * 2)
+            StageType.PRECISION -> min(110, 80 + k / 2)
             StageType.SURVIVAL -> if (n % 2 == 0) 0 else 1
-            StageType.PERFECT -> min(50, 20 + k / 2)
-            StageType.FRENZY -> min(6, 4 + k / 15)
-            StageType.BOSS -> roundTo(expectedScore(n) * 0.78f, 10)
+            StageType.PERFECT -> min(45, 25 + k / 3)
+            StageType.FRENZY -> min(6, 4 + k / 20)
+            StageType.BOSS -> roundTo(expectedScore(n) * 0.7f, 10)
         }
         return build(n, type, target)
     }

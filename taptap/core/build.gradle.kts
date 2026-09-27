@@ -27,6 +27,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("calibrate", System.getProperty("calibrate") ?: "false")
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
