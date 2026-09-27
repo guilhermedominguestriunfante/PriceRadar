@@ -333,3 +333,61 @@ abstract class DebugKeystoreTask : DefaultTask() {
         }
     }
 }
+
+/**
+ * Produces the final manifest: injects `android:versionCode`/`android:versionName` and a
+ * `<uses-sdk>` element (like AGP's manifest merger does) so every consumer — aapt2 and
+ * Robolectric — sees the same values.
+ */
+@CacheableTask
+abstract class ProcessManifestTask : DefaultTask() {
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val sourceManifest: RegularFileProperty
+    @get:Input abstract val minSdk: Property<Int>
+    @get:Input abstract val targetSdk: Property<Int>
+    @get:Input abstract val versionCode: Property<Int>
+    @get:Input abstract val versionName: Property<String>
+    @get:OutputFile abstract val outputManifest: RegularFileProperty
+
+    @TaskAction
+    fun process() {
+        var xml = sourceManifest.get().asFile.readText()
+        val start = xml.indexOf("<manifest")
+        if (start < 0) throw GradleException("No <manifest> element in ${sourceManifest.get().asFile}")
+        val tagEnd = xml.indexOf('>', start)
+        var tag = xml.substring(start, tagEnd)
+        if (!tag.contains("android:versionCode")) tag += "\n    android:versionCode=\"${versionCode.get()}\""
+        if (!tag.contains("android:versionName")) tag += "\n    android:versionName=\"${versionName.get()}\""
+        xml = xml.substring(0, start) + tag + xml.substring(tagEnd)
+        if (!xml.contains("<uses-sdk")) {
+            val insertAt = xml.indexOf('>', xml.indexOf("<manifest")) + 1
+            val usesSdk = "\n\n    <uses-sdk android:minSdkVersion=\"${minSdk.get()}\" " +
+                "android:targetSdkVersion=\"${targetSdk.get()}\" />"
+            xml = xml.substring(0, insertAt) + usesSdk + xml.substring(insertAt)
+        }
+        outputManifest.get().asFile.apply { parentFile.mkdirs() }.writeText(xml)
+    }
+}
+
+/** Writes `com/android/tools/test_config.properties`, the file Robolectric uses to find app resources. */
+abstract class RobolectricConfigTask : DefaultTask() {
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val manifest: RegularFileProperty
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val resourcesApk: RegularFileProperty
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) abstract val assets: ConfigurableFileCollection
+    @get:Input abstract val packageName: Property<String>
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        val file = outputDir.get().asFile.resolve("com/android/tools/test_config.properties")
+        file.parentFile.mkdirs()
+        val assetsDir = assets.files.firstOrNull() ?: File(temporaryDir, "no-assets").apply { mkdirs() }
+        file.writeText(
+            """
+            android_merged_manifest=${manifest.get().asFile.absolutePath}
+            android_merged_assets=${assetsDir.absolutePath}
+            android_resource_apk=${resourcesApk.get().asFile.absolutePath}
+            android_custom_package=${packageName.get()}
+            """.trimIndent() + "\n"
+        )
+    }
+}

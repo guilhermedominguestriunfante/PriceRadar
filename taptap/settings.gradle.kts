@@ -17,4 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "taptap"
 
-include(":core", ":tools", ":app")
+include(":core", ":tools", ":app", ":testshim")

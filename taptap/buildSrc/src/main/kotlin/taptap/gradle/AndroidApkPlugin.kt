@@ -69,6 +69,9 @@ class AndroidApkPlugin : Plugin<Project> {
             val jar = project.files(androidJar)
             project.dependencies.add("compileOnly", jar)
             project.dependencies.add("testCompileOnly", jar)
+            // Robolectric's own (non-sandboxed) classes reference android.* types; AGP puts a
+            // "mockable" android.jar on this classpath for the same reason.
+            project.dependencies.add("testRuntimeOnly", jar)
         }
 
         val proguardConfig = project.configurations.create("proguard") {
@@ -95,6 +98,16 @@ class AndroidApkPlugin : Plugin<Project> {
             compiledZip.set(build.file("intermediates/res/compiled.flat.zip"))
         }
 
+        val processManifest = project.tasks.register("processManifest", ProcessManifestTask::class.java) {
+            group = "build"
+            sourceManifest.set(File(mainDir, "AndroidManifest.xml"))
+            minSdk.set(ext.minSdk)
+            targetSdk.set(ext.targetSdk)
+            versionCode.set(ext.versionCode)
+            versionName.set(ext.versionName)
+            outputManifest.set(build.file("intermediates/manifest/AndroidManifest.xml"))
+        }
+
         val debugKeystore = project.tasks.register("debugKeystore", DebugKeystoreTask::class.java) {
             keystore.set(File(System.getProperty("user.home"), ".android/debug.keystore"))
         }
@@ -107,7 +120,7 @@ class AndroidApkPlugin : Plugin<Project> {
                 group = "build"
                 aapt2.fileProvider(project.provider { sdk.aapt2 })
                 compiledZip.set(compileResources.flatMap { it.compiledZip })
-                manifest.set(File(mainDir, "AndroidManifest.xml"))
+                manifest.set(processManifest.flatMap { it.outputManifest })
                 this.androidJar.fileProvider(resourcesJar)
                 assets.from(mergeAssets)
                 minSdk.set(ext.minSdk)
@@ -208,6 +221,24 @@ class AndroidApkPlugin : Plugin<Project> {
                 }
             }
         }
+
+        project.pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+            configureRobolectric(project, ext, mergeAssets)
+        }
+    }
+
+    private fun configureRobolectric(project: Project, ext: AndroidApkExtension, mergeAssets: Any) {
+        val build = project.layout.buildDirectory
+        val link = project.tasks.named("linkDebugResources", Aapt2LinkTask::class.java)
+        val config = project.tasks.register("robolectricConfig", RobolectricConfigTask::class.java) {
+            manifest.set(link.flatMap { it.manifest })
+            resourcesApk.set(link.flatMap { it.resourcesApk })
+            assets.from(mergeAssets)
+            packageName.set(ext.applicationId)
+            outputDir.set(build.dir("generated/robolectric"))
+        }
+        val sourceSets = project.extensions.getByType(SourceSetContainer::class.java)
+        sourceSets.getByName("test").resources.srcDir(config.flatMap { it.outputDir })
     }
 
     private class ReleaseSigning(val storeFile: File, val storePassword: String, val keyAlias: String, val keyPassword: String)
