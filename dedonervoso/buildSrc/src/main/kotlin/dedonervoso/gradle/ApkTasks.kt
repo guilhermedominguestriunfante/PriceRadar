@@ -6,6 +6,7 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
@@ -14,6 +15,7 @@ import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
@@ -282,7 +284,11 @@ abstract class ZipAlignTask : DefaultTask() {
 abstract class SignApkTask : DefaultTask() {
     @get:Internal abstract val apksigner: RegularFileProperty
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val inputApk: RegularFileProperty
-    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val keystore: RegularFileProperty
+    @get:Optional @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val keystore: RegularFileProperty
+    /** Keystore content (base64) when it comes from an environment secret instead of a file. */
+    @get:Internal abstract val keystoreBase64: Property<String>
+    /** Fingerprint of [keystoreBase64] so a key change re-signs; the secret itself is never an input. */
+    @get:Optional @get:Input val keystoreDigest: Provider<String> = keystoreBase64.map { sha256Hex(it.toByteArray()) }
     @get:Internal abstract val storePassword: Property<String>
     @get:Input abstract val keyAlias: Property<String>
     @get:Internal abstract val keyPassword: Property<String>
@@ -294,19 +300,33 @@ abstract class SignApkTask : DefaultTask() {
     fun sign() {
         val out = signedApk.get().asFile
         out.delete()
-        exec.exec {
-            environment("TAPTAP_KS_PASS", storePassword.get())
-            environment("TAPTAP_KEY_PASS", keyPassword.get())
-            commandLine(
-                apksigner.get().asFile, "sign",
-                "--ks", keystore.get().asFile,
-                "--ks-pass", "env:TAPTAP_KS_PASS",
-                "--key-pass", "env:TAPTAP_KEY_PASS",
-                "--ks-key-alias", keyAlias.get(),
-                "--min-sdk-version", minSdk.get(),
-                "--out", out,
-                inputApk.get().asFile,
-            )
+        val ks = if (keystore.isPresent) {
+            keystore.get().asFile
+        } else {
+            // Decoded into the task's private temp dir only for the signing call, then deleted.
+            File(temporaryDir, "release.keystore").also { f ->
+                f.writeBytes(java.util.Base64.getDecoder().decode(keystoreBase64.get()))
+                f.setReadable(false, false)
+                f.setReadable(true, true)
+            }
+        }
+        try {
+            exec.exec {
+                environment("DEDO_KS_PASS", storePassword.get())
+                environment("DEDO_KEY_PASS", keyPassword.get())
+                commandLine(
+                    apksigner.get().asFile, "sign",
+                    "--ks", ks,
+                    "--ks-pass", "env:DEDO_KS_PASS",
+                    "--key-pass", "env:DEDO_KEY_PASS",
+                    "--ks-key-alias", keyAlias.get(),
+                    "--min-sdk-version", minSdk.get(),
+                    "--out", out,
+                    inputApk.get().asFile,
+                )
+            }
+        } finally {
+            if (!keystore.isPresent) ks.delete()
         }
         val verifyOutput = ByteArrayOutputStream()
         exec.exec {
@@ -399,3 +419,6 @@ abstract class RobolectricConfigTask : DefaultTask() {
         )
     }
 }
+
+internal fun sha256Hex(bytes: ByteArray): String =
+    java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

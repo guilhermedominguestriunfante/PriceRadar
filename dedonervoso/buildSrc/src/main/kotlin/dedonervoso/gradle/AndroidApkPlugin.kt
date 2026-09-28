@@ -189,13 +189,13 @@ class AndroidApkPlugin : Plugin<Project> {
                     if (!debuggable) {
                         doFirst {
                             logger.warn(
-                                "WARNING: no release signing config (keystore.properties or TAPTAP_KEYSTORE* env). " +
+                                "WARNING: no release signing config (keystore.properties or DEDO_KEYSTORE* env). " +
                                     "The release APK is signed with the debug key."
                             )
                         }
                     }
                 } else {
-                    keystore.set(release.storeFile)
+                    if (release.storeFile != null) keystore.set(release.storeFile) else keystoreBase64.set(release.storeBase64)
                     storePassword.set(release.storePassword)
                     keyAlias.set(release.keyAlias)
                     keyPassword.set(release.keyPassword)
@@ -242,27 +242,39 @@ class AndroidApkPlugin : Plugin<Project> {
         sourceSets.getByName("test").resources.srcDir(config.flatMap { it.outputDir })
     }
 
-    private class ReleaseSigning(val storeFile: File, val storePassword: String, val keyAlias: String, val keyPassword: String)
+    private class ReleaseSigning(
+        val storeFile: File?,
+        val storeBase64: String?,
+        val storePassword: String,
+        val keyAlias: String,
+        val keyPassword: String,
+    )
 
-    /** Reads `keystore.properties` (root project) or `TAPTAP_KEYSTORE*` environment variables. */
+    /**
+     * Release key, in order: `keystore.properties` (root project); `DEDO_KEYSTORE_B64` (the
+     * keystore itself, base64 — suits CI and cloud environment secrets); `DEDO_KEYSTORE` (a path).
+     * Passwords come from `DEDO_KEYSTORE_PASSWORD` / `DEDO_KEY_PASSWORD`; the alias from
+     * `DEDO_KEY_ALIAS` (default "dedonervoso"). Nothing here is ever written into the project.
+     */
     private fun releaseSigning(project: Project): ReleaseSigning? {
         val propsFile = project.rootProject.file("keystore.properties")
         if (propsFile.isFile) {
             val p = Properties().apply { propsFile.inputStream().use { load(it) } }
             return ReleaseSigning(
                 project.rootProject.file(p.getProperty("storeFile")),
+                null,
                 p.getProperty("storePassword"),
                 p.getProperty("keyAlias"),
                 p.getProperty("keyPassword", p.getProperty("storePassword")),
             )
         }
-        val file = System.getenv("TAPTAP_KEYSTORE") ?: return null
-        return ReleaseSigning(
-            File(file),
-            System.getenv("TAPTAP_KEYSTORE_PASSWORD") ?: return null,
-            System.getenv("TAPTAP_KEY_ALIAS") ?: return null,
-            System.getenv("TAPTAP_KEY_PASSWORD") ?: System.getenv("TAPTAP_KEYSTORE_PASSWORD"),
-        )
+        val password = System.getenv("DEDO_KEYSTORE_PASSWORD")?.takeIf { it.isNotEmpty() } ?: return null
+        val alias = System.getenv("DEDO_KEY_ALIAS")?.takeIf { it.isNotEmpty() } ?: "dedonervoso"
+        val keyPassword = System.getenv("DEDO_KEY_PASSWORD")?.takeIf { it.isNotEmpty() } ?: password
+        val base64 = System.getenv("DEDO_KEYSTORE_B64")?.filterNot { it.isWhitespace() }?.takeIf { it.isNotEmpty() }
+        if (base64 != null) return ReleaseSigning(null, base64, password, alias, keyPassword)
+        val path = System.getenv("DEDO_KEYSTORE")?.takeIf { it.isNotEmpty() } ?: return null
+        return ReleaseSigning(File(path), null, password, alias, keyPassword)
     }
 
     private companion object {

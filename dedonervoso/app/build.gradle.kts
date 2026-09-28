@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.security.MessageDigest
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // Android application: rendering, input, audio, haptics and storage on top of :core.
@@ -15,8 +18,8 @@ androidApk {
     resourcesSdk.set(34)
     minSdk.set(26)
     targetSdk.set(35)
-    versionCode.set(1)
-    versionName.set("1.0.0")
+    versionCode.set(2)
+    versionName.set("1.1.0")
     apkBaseName.set("dedo-nervoso")
     proguardFiles.from("proguard-rules.pro")
 }
@@ -163,3 +166,58 @@ val releaseSmokeTest = tasks.register<Test>("releaseSmokeTest") {
     }
 }
 tasks.named("check") { dependsOn(releaseSmokeTest) }
+
+// ---- Release publishing -----------------------------------------------------------------------
+// `./gradlew publishRelease` builds the release APK, copies it to ../release/dedo-nervoso.apk and
+// writes ../release/version.json. Installed games read that manifest from the repository's
+// default branch (UpdateChecker), so merging a release into `main` is what ships it to players.
+val releaseDir: Directory = rootProject.layout.projectDirectory.dir("release")
+val releaseBaseUrl = "https://raw.githubusercontent.com/guilhermedominguestriunfante/PriceRadar/main/dedonervoso/release"
+tasks.register("publishRelease") {
+    group = "distribution"
+    description = "Builds the signed release APK and publishes it with version.json to release/."
+    dependsOn("assembleRelease")
+    val apkFile = layout.buildDirectory.file("outputs/apk/release/dedo-nervoso-release.apk")
+    val notesFile = layout.projectDirectory.file("release-notes.json")
+    val code = androidApk.versionCode
+    val name = androidApk.versionName
+    val appId = androidApk.applicationId
+    // Online play requires the newest version unless a lower floor is given (-PminOnlineVersionCode=N).
+    val minOnline = providers.gradleProperty("minOnlineVersionCode").map { it.toInt() }.orElse(code)
+    val apksigner = provider { dedonervoso.gradle.AndroidSdk.locate(project).apksigner }
+    inputs.file(apkFile)
+    inputs.file(notesFile)
+    inputs.property("versionCode", code)
+    inputs.property("minOnlineVersionCode", minOnline)
+    outputs.dir(releaseDir)
+    doLast {
+        val apk = apkFile.get().asFile
+        val verify = ProcessBuilder(apksigner.get().absolutePath, "verify", "--print-certs", apk.absolutePath)
+            .redirectErrorStream(true).start()
+        val certs = verify.inputStream.bufferedReader().readText()
+        if (verify.waitFor() != 0) throw GradleException("apksigner could not verify $apk:\n$certs")
+        if ("Android Debug" in certs) {
+            throw GradleException("Refusing to publish a release signed with the debug key: set DEDO_KEYSTORE_B64 / DEDO_KEYSTORE_PASSWORD.")
+        }
+        val bytes = apk.readBytes()
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        @Suppress("UNCHECKED_CAST")
+        val notes = groovy.json.JsonSlurper().parse(notesFile.asFile) as Map<String, Any>
+        val manifest = linkedMapOf(
+            "schema" to 1,
+            "app" to appId.get(),
+            "versionCode" to code.get(),
+            "versionName" to name.get(),
+            "minOnlineVersionCode" to minOnline.get(),
+            "apkUrl" to "$releaseBaseUrl/dedo-nervoso.apk",
+            "size" to bytes.size,
+            "sha256" to sha256,
+            "publishedAt" to LocalDate.now(ZoneOffset.UTC).toString(),
+            "notes" to notes,
+        )
+        val dir = releaseDir.asFile.apply { mkdirs() }
+        apk.copyTo(File(dir, "dedo-nervoso.apk"), overwrite = true)
+        File(dir, "version.json").writeText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + "\n")
+        logger.lifecycle("Published ${name.get()} (${code.get()}) → ${dir.relativeTo(rootDir.parentFile)}; online requires ≥ ${minOnline.get()}.")
+    }
+}
