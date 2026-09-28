@@ -227,7 +227,7 @@ object StageCatalog {
         17 -> build(17, StageType.SPEED, speedTarget(17), Mechanic.SPECIAL_ZONES)
         18 -> build(18, StageType.PRECISION, 70)
         19 -> build(19, StageType.FRENZY, 3)
-        20 -> build(20, StageType.BOSS, roundTo(expectedScore(20) * 0.66f, 10))
+        20 -> build(20, StageType.BOSS, roundTo(expectedScore(20) * 0.6f, 10))
         21 -> build(21, StageType.COMBO, 350, Mechanic.MOVING_ZONES)
         22 -> build(22, StageType.SCORE, scoreTarget(22))
         23 -> build(23, StageType.PRECISION, 80, Mechanic.LOCK_ZONES)
