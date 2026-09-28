@@ -1,0 +1,12 @@
+Fonts bundled with Dedo Nervoso
+===============================
+
+display_black.ttf, display_bold.ttf ("Nervoso Display")
+  Modified version (static weight instances, Latin subset, renamed as required by the
+  Reserved Font Name clause) of Orbitron, Copyright 2018 The Orbitron Project Authors
+  (https://github.com/theleagueof/orbitron). Licensed under the SIL Open Font License 1.1
+  (see Orbitron-OFL.txt).
+
+rajdhani_bold.ttf, rajdhani_semibold.ttf, rajdhani_medium.ttf
+  Latin subset of Rajdhani, Copyright (c) 2014, Indian Type Foundry. Licensed under the SIL
+  Open Font License 1.1 (see Rajdhani-OFL.txt).
