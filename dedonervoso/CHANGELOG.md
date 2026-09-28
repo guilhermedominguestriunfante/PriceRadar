@@ -3,6 +3,34 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.1.0] — 2026-09-28 · Dedo Nervoso
+
+Novo nome e primeira versão online (`com.dedonervoso.app`, versionCode 2). É um app novo para o
+Android (pacote e assinatura novos): quem tinha o TAP TAP 1.0.0 instala este separadamente.
+
+### Identidade
+- Nome **Dedo Nervoso**, ícone da luva com o dedo tremendo (versão temática/monocromática),
+  logo DEDO / NERVOSO com tremedeira e abertura animada com som (um toque pula).
+- Fonte de títulos renomeada "Nervoso Display" (derivada da Orbitron, OFL).
+
+### Online (opcional, Firebase)
+- Ranking online Global, da Semana e entre Amigos, por pontos ou por taps.
+- Código de amigo no Perfil, *Convidar* (compartilha código + link) e *Adicionar amigo*.
+- Conta anônima automática; *Apagar dados online* remove tudo do servidor.
+- Regras de segurança no servidor: cada um só altera os próprios dados, valores plausíveis,
+  recorde nunca diminui, versão mínima para gravar.
+
+### Versões e atualizações
+- Aviso de **nova versão** na tela inicial, com novidades e botão Baixar; *Procurar
+  atualização* nas Configurações.
+- O online exige a versão mais recente; offline continua liberado em qualquer versão.
+- Release sempre assinado com a mesma chave (atualizações instalam por cima);
+  `publishRelease` gera `release/dedo-nervoso.apk` e `release/version.json`.
+
+### Correções
+- Build de release a partir de um `clean` (regras do ProGuard eram apagadas antes de rodar).
+- Testes do app agora rodam de novo quando recursos ou assets mudam.
+
 ## [1.0.0] — 2026-09-28
 
 Primeira versão jogável e instalável (`com.dedonervoso.app`, versionCode 1).

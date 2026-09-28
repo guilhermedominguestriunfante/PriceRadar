@@ -1,28 +1,29 @@
-# TAP TAP
+# Dedo Nervoso
 
 Jogo arcade de reflexo para Android: toque o mais rápido que conseguir, **pare no STOP**,
 acerte as **Hot Zones**, encha o **FRENZY** e avance por fases infinitas com chefes a cada 10.
-Partidas de 60 segundos, neon, som e vibração em cada toque.
+Partidas de 60 segundos, neon, som e vibração em cada toque — e ranking online com os amigos.
 
-- Pacote: `com.dedonervoso.app` · versão **1.0.0** (versionCode 1)
+- Pacote: `com.dedonervoso.app` · versão **1.1.0** (versionCode 2)
 - Android 8.0+ (minSdk 26) · targetSdk 35 · somente retrato
-- 100% offline. Sem anúncios, sem compras, sem conta, sem pay-to-win.
+- Offline por padrão; online opcional (Firebase). Sem anúncios, sem compras, sem pay-to-win.
 - Idiomas: português e inglês (automático pelo sistema ou escolhido nas configurações).
 
-## Instalar
+## Baixar e instalar
 
-Os APKs prontos ficam em [`apk/`](apk/):
+O APK de cada versão publicada fica em [`release/`](release/):
 
-| Arquivo | Uso |
-|---|---|
-| `apk/taptap-release.apk` | Versão para jogar: otimizada, ofuscada e assinada com chave de release |
-| `apk/taptap-debug.apk` | Versão de desenvolvimento (depurável, assinada com a chave de debug) |
+- **Link fixo (versão mais recente, depois do merge no `main`):**
+  <https://raw.githubusercontent.com/guilhermedominguestriunfante/PriceRadar/main/dedonervoso/release/dedo-nervoso.apk>
+- `release/version.json` descreve a versão (número, novidades, versão mínima para o online) e é
+  o que o jogo consulta para avisar de atualizações.
 
-No celular, abra o arquivo e permita "instalar apps desconhecidos"; ou, com o aparelho
-conectado: `adb install -r apk/taptap-release.apk`.
+No celular, abra o link, baixe e toque no arquivo; permita "instalar apps desconhecidos" para o
+navegador. O Play Protect pode avisar que o app é de um desenvolvedor desconhecido
+(*Mais detalhes → Instalar mesmo assim*): é normal para apps fora da Play Store.
 
-> As duas versões têm o mesmo pacote e assinaturas diferentes: para trocar de uma para a
-> outra é preciso desinstalar antes.
+Todas as versões são assinadas com a mesma chave, então as atualizações instalam **por cima**,
+sem perder o progresso.
 
 ## Como jogar
 
@@ -61,25 +62,48 @@ Sair do app pausa a partida; ao voltar, há contagem 3-2-1.
 - **Acessibilidade**: STOP nunca depende só da cor (ícone de mão + texto + som),
   opção **Reduzir efeitos** (sem tremor, flashes e piscadas), textos ajustados à largura.
 - **Configurações**: música, efeitos sonoros, vibração, reduzir efeitos, mostrar FPS,
-  idioma, resetar progresso (com dupla confirmação) e Sobre.
+  ranking online, idioma, resetar progresso (com dupla confirmação), apagar dados online,
+  procurar atualização e Sobre.
+- **Identidade**: ícone da luva com o dedo "nervoso", logo DEDO / NERVOSO com tremedeira e
+  abertura animada (pula com um toque).
 - **Desenvolvedor**: botão com o LinkedIn do criador na tela inicial e em Sobre
   ([linkedin.com/in/guilhermekawe](https://www.linkedin.com/in/guilhermekawe/)).
 
+## Online (opcional)
+
+- **Ranking online**: Global, da Semana (zera toda segunda, 00:00 UTC) e entre **Amigos**, por
+  pontos ou por taps. O jogador ativa em *Ranking → Online* ou nas Configurações, depois de ver o
+  que fica visível (apelido, avatar e recordes).
+- **Amigos**: cada jogador tem um **código de amigo** (ex.: `K7P-3QX`) no Perfil. *Convidar*
+  compartilha o código e o link de download (WhatsApp ou qualquer app); *Adicionar amigo*
+  recebe o código de alguém.
+- **Conta**: anônima, criada sozinha (sem e-mail, sem senha); a identidade fica guardada no
+  aparelho. *Configurações → Apagar dados online* remove tudo do servidor.
+- **Versões**: o jogo consulta `release/version.json` ao abrir e avisa na tela inicial quando há
+  versão nova (com as novidades e o botão Baixar). Quem estiver numa versão antiga continua
+  jogando offline normalmente, mas **o online exige a versão mais recente**.
+- Configuração do servidor: [docs/FIREBASE.md](docs/FIREBASE.md). Como publicar versões:
+  [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Privacidade
 
-O app pede só a permissão `VIBRATE`. Não tem acesso à internet, não coleta dados, não pede
-telefone, e-mail, localização ou contatos. O progresso fica em um arquivo JSON no
-armazenamento interno do app (e entra no backup do sistema, se o usuário tiver ativado).
+Permissões: `VIBRATE` e `INTERNET` (aviso de versões e, se o jogador ativar, o online). Nada de
+localização, contatos, telefone ou e-mail. Offline, o progresso fica só no aparelho (JSON no
+armazenamento interno, com backup do sistema se o usuário tiver ativado). Com o online ativo, o
+servidor guarda apenas apelido, avatar, código de amigo, lista de amigos e recordes.
 
 ## Arquitetura
 
 ```
-taptap/
-├── core/       Kotlin puro (sem Android): motor, regras, progressão, save, áudio, textos
+dedonervoso/
+├── core/       Kotlin puro (sem Android): motor, regras, progressão, save, áudio, textos, online
 ├── app/        Cliente Android: activity, renderização, telas, som, vibração, armazenamento
 ├── tools/      Gerador dos efeitos sonoros (roda no build, grava WAVs em assets)
 ├── testshim/   Substitutos mínimos de androidx.test para o Robolectric
-└── buildSrc/   Plugin Gradle `dedonervoso.android-apk` que gera o APK com as ferramentas do SDK
+├── buildSrc/   Plugin Gradle `dedonervoso.android-apk` que gera o APK com as ferramentas do SDK
+├── firebase/   Regras do Firestore e configuração dos emuladores
+├── docs/       FIREBASE.md (configurar o online) e RELEASING.md (publicar versões)
+└── release/    APK publicado + version.json (lido pelo jogo para avisar de atualizações)
 ```
 
 **core** (testável na JVM, sem dependências):
@@ -96,6 +120,8 @@ taptap/
 - `progression/*` — economia, upgrades, XP, conquistas, missões, desafio diário, ranking
   (`LeaderboardSource` pronto para uma fonte online no futuro) e validação de resultados.
 - `save/SaveCodec` — JSON versionado próprio, tolerante a campos ausentes/corrompidos.
+- `online/*` — cliente REST do Firebase (conta anônima, Firestore), rankings, amigos e o
+  manifesto de versões (`UpdatePolicy`: o online exige a versão mínima; offline nunca).
 - `audio/*` — síntese dos efeitos e o motor de música procedural.
 
 **app**:
@@ -107,7 +133,8 @@ taptap/
   no gameplay.
 - `SfxPlayer` (SoundPool, baixa latência), `MusicPlayer` (thread com AudioTrack),
   `Haptics` (thread dedicada), `SaveStore` (AtomicFile, escrita em segundo plano com
-  debounce e flush ao pausar).
+  debounce e flush ao pausar), `Updates` (aviso de versão) e `Online` (chamadas de rede numa
+  thread própria, resultado entregue na thread da interface).
 
 ## Compilar
 
@@ -117,18 +144,22 @@ Requisitos: **JDK 21**, Android SDK com `platforms/android-35` e `platforms/andr
 em `ANDROID_HOME`. Ferramentas ausentes do SDK também são procuradas no `PATH`.
 
 ```bash
-./gradlew assembleDebug         # app/build/outputs/apk/debug/taptap-debug.apk
-./gradlew assembleRelease       # app/build/outputs/apk/release/taptap-release.apk
-./gradlew publishApks           # gera os dois e copia para apk/
+./gradlew assembleDebug         # app/build/outputs/apk/debug/dedo-nervoso-debug.apk
+./gradlew assembleRelease       # app/build/outputs/apk/release/dedo-nervoso-release.apk
+./gradlew publishRelease        # release assinado → release/dedo-nervoso.apk + version.json
 ./gradlew installDebug          # instala no aparelho conectado (adb)
 ./gradlew check                 # todos os testes (ver abaixo)
 ```
 
-**Assinatura de release**: crie um `keystore.properties` na raiz do projeto
-(`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) ou defina `TAPTAP_KEYSTORE`,
-`TAPTAP_KEYSTORE_PASSWORD`, `TAPTAP_KEY_ALIAS` e `TAPTAP_KEY_PASSWORD`. Keystores e
-`keystore.properties` estão no `.gitignore` e **nunca** devem ser versionados. Sem
-configuração, o release é assinado com a chave de debug e o build avisa.
+**Assinatura de release**: `DEDO_KEYSTORE_B64` (o keystore em base64) e
+`DEDO_KEYSTORE_PASSWORD` no ambiente — ou `keystore.properties` na raiz (`storeFile`,
+`storePassword`, `keyAlias`, `keyPassword`). Keystores e `keystore.properties` estão no
+`.gitignore` e **nunca** devem ser versionados. `publishRelease` se recusa a publicar um APK
+assinado com a chave de debug.
+
+**Online**: `DEDO_FIREBASE_PROJECT_ID` e `DEDO_FIREBASE_API_KEY` no ambiente de build (veja
+[docs/FIREBASE.md](docs/FIREBASE.md)). Sem elas o build funciona e o online aparece como
+indisponível.
 
 **Por que não AGP / Compose?** O ambiente em que o projeto foi criado não acessava o
 repositório Maven do Google (dl.google.com), então o plugin em `buildSrc` executa
@@ -145,6 +176,10 @@ escolha natural. A migração para o AGP está no [ROADMAP](ROADMAP.md).
   partida completa + progresso salvo e recarregado, pausa ao sair com 3-2-1, STOP / zonas /
   frenzy, navegação por todos os menus, botão do LinkedIn, regra de 2 dedos, tela pequena.
   Capturas de tela vão para `app/build/screenshots/`.
+- Online: testes de integração contra os **emuladores oficiais do Firebase** com as regras reais
+  (contas, códigos, rankings, amigos, regras recusando trapaças) e o fluxo completo no app
+  (ativar, ranking global, adicionar amigo, partida publicada no ranking da semana, versão
+  obrigatória). Pulados quando os emuladores não estão rodando.
 - `:app:releaseSmokeTest` — executa o **bytecode de release** (saída otimizada e ofuscada
   do ProGuard) jogando uma sessão inteira só por toques e confere o save em disco.
 
@@ -153,7 +188,7 @@ escolha natural. A migração para o AGP está no [ROADMAP](ROADMAP.md).
 Desenvolvedor: [linkedin.com/in/guilhermekawe](https://www.linkedin.com/in/guilhermekawe/).
 
 Fontes (SIL Open Font License 1.1, licenças em `app/src/main/assets/licenses/`):
-"TapTap Display", versão modificada da Orbitron (© 2018 The Orbitron Project Authors), e
+"Nervoso Display", versão modificada da Orbitron (© 2018 The Orbitron Project Authors), e
 Rajdhani (© 2014 Indian Type Foundry). Sons e música são gerados pelo próprio código.
 
 Veja também: [CHANGELOG](CHANGELOG.md) · [ROADMAP](ROADMAP.md)

@@ -1,41 +1,38 @@
 # Roadmap
 
-O que vem depois da 1.0.0, em ordem de prioridade.
+O que vem depois da 1.1.0, em ordem de prioridade.
 
-## Curto prazo (1.0.x)
+## Próximo (1.2) — Duelo ao vivo
 
-- **Testes em aparelhos reais**: rodar a 1.0.0 em 3–4 aparelhos (um de entrada, um médio,
-  um topo de linha, um com tela 20:9 e notch) medindo latência toque→som, FPS com efeitos
-  cheios e consumo de bateria numa sessão de 15 min; ajustar `GameBalance` com dados reais
-  de jogadores (a calibração atual vem de jogadores simulados).
-- **Build padrão Android**: migrar do plugin próprio (`buildSrc`) para o Android Gradle
-  Plugin quando o repositório Maven do Google estiver acessível, mantendo o nome dos APKs.
-  Isso habilita R8, App Bundle (`.aab`), baseline profiles e o Android Lint.
-- **CI**: workflow que roda `./gradlew check publishApks` a cada push e publica os APKs
-  como artefatos; assinatura de release via secrets do repositório.
-- **Testes instrumentados** (emulador) para o que o Robolectric não cobre: SoundPool e
-  AudioTrack reais, vibração, insets de notch e navegação por gestos.
+- **Convite**: escolher um amigo e convidar; se ele estiver com o jogo aberto, o convite aparece
+  na hora; se não, vai um link pelo WhatsApp.
+- **Partida simultânea**: os dois jogam a mesma fase com exatamente os mesmos STOPs e zonas
+  (mesma semente), com o placar do adversário ao vivo no topo. Firebase Realtime Database
+  (stream em tempo real pela API REST, sem SDK), plano gratuito.
+- **Itens de sabotagem**: cai uma bola na tela e só é capturada mantendo o ritmo por alguns
+  segundos (ex.: 12 toques/s por 3 s — calibrado jogando). Com ela você lança no adversário:
+  relógio −3 s, lentidão, STOP surpresa, tela embaçada; e há um escudo para se defender.
+- Desconexão tratada (quem cai perde após alguns segundos), anti-trapaça básico.
 
-## Médio prazo (1.1)
+## Em seguida
 
-- **Ranking online opcional**: nova implementação de `LeaderboardSource` (global, amigos,
-  temporadas), com os resultados passando pelo `ResultValidator` também no servidor.
-  Continuará opcional: o jogo segue 100% jogável offline e sem conta.
-- **Desafio diário compartilhado**: mesma semente para todos no dia, com placar próprio.
-- **Mais conteúdo**: novos tipos de zona (bomba que exige evitar, zona de ritmo), novos
-  chefes com padrões próprios e eventos de fim de semana.
-- **Cosméticos por moedas**: temas de cor e trilhas de partículas — sem efeito no placar.
-- **Acessibilidade**: modo daltônico com paleta alternativa, tamanho de texto ajustável e
-  opção de vibração mais forte para o STOP.
+- **Entrar com Google** (um toque) ligando a conta anônima — progresso na nuvem para trocar
+  de celular. Precisa liberar `dl.google.com` no ambiente e registrar o app Android no
+  Firebase (pacote + SHA-1 em docs/FIREBASE.md).
+- **Salvamento na nuvem** do progresso (moedas, fases, upgrades) ligado à conta.
+- **Notificações com o app fechado** (convites de duelo): Firebase Cloud Messaging + Cloud
+  Functions (exige o plano Blaze com cartão, com cota gratuita).
+- **Mais viciante**: revanche instantânea, recompensa diária crescente, modo infinito,
+  coleção de cosméticos, eventos semanais.
 
-## Longo prazo
+## Play Store
 
-- Temporadas com passe gratuito de recompensas cosméticas.
-- Modo versus local (dois jogadores na mesma tela, metade cada).
-- Replays curtos exportáveis do melhor momento da partida.
-- Mais idiomas (espanhol primeiro).
+- Build com o Android Gradle Plugin (App Bundle `.aab`), targetSdk exigido no ano, política de
+  privacidade (pode ficar no GitHub Pages), formulário de dados, classificação 13+.
+- Teste fechado com 12 testadores por 14 dias (os amigos do ranking).
+- Monetização sem pay-to-win: vídeo recompensado opcional, "remover anúncios", cosméticos.
 
 ## Princípios que não mudam
 
-Sem anúncios, sem compras com dinheiro real, sem pay-to-win, sem coleta de dados pessoais
-e sem exigir conta para jogar.
+Sem pay-to-win, sem coleta de dados pessoais além do necessário para o online, online sempre
+opcional e o jogo sempre jogável offline.
