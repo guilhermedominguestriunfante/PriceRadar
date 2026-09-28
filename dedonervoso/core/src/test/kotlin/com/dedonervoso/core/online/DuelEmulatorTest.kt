@@ -104,6 +104,10 @@ class DuelEmulatorTest {
         val id = duels.challenge(host, alice, guest.uid)
 
         fun denied(block: () -> Unit) = assertEquals(OnlineFailure.DENIED, assertFailsWith<OnlineException> { block() }.failure)
+        // A new room carries only host, guest, seed and time: no forged answer or scores.
+        val base = mapOf("host" to host.uid, "guest" to guest.uid, "seed" to 1, "createdAt" to RealtimeDb.SERVER_TIMESTAMP)
+        denied { db.put(host, "duels/forgedRoom0001", base + ("accepted" to true)) }
+        denied { db.put(host, "duels/forgedRoom0002", base + ("players" to mapOf(guest.uid to mapOf("nick" to "BOB", "avatar" to 1, "score" to 0, "at" to RealtimeDb.SERVER_TIMESTAMP)))) }
         denied { db.get(stranger, "duels/$id") }
         assertNull(duels.room(stranger, id))   // what a stranger sees: nothing
         denied { duels.setStart(host, id, System.currentTimeMillis() + 5_000) }   // not accepted yet

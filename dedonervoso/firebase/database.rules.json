@@ -20,7 +20,7 @@
       "$duel": {
         ".read": "auth != null && (data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid)",
         ".write": "auth != null && ((!data.exists() && newData.child('host').val() === auth.uid) || (!newData.exists() && (data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid)))",
-        ".validate": "$duel.matches(/^[A-Za-z0-9_-]{8,40}$/) && newData.hasChildren(['host', 'guest', 'seed', 'createdAt'])",
+        ".validate": "$duel.matches(/^[A-Za-z0-9_-]{8,40}$/) && newData.hasChildren(['host', 'guest', 'seed', 'createdAt']) && (data.exists() || !(newData.hasChild('accepted') || newData.hasChild('startAt') || newData.hasChild('cancelled') || newData.hasChild('players') || newData.hasChild('items')))",
         "host": { ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())" },
         "guest": { ".validate": "newData.isString() && newData.val() !== newData.parent().child('host').val() && (!data.exists() || newData.val() === data.val())" },
         "seed": { ".validate": "newData.isNumber() && (!data.exists() || newData.val() === data.val())" },
