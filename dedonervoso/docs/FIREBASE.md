@@ -7,6 +7,21 @@ Services.
 Quer que o Codex faça a configuração por você? Veja
 [CODEX-FIREBASE-SETUP.md](CODEX-FIREBASE-SETUP.md).
 
+## Projeto em uso (configurado em 28/09/2026)
+
+| | |
+|---|---|
+| Projeto | `dedo-nervoso-7284` (número 976446935708), plano Spark, sem faturamento |
+| Authentication | Anônimo ativado |
+| Firestore `(default)` | `southamerica-east1`, edição Standard, proteção contra exclusão ligada, regras deste repositório publicadas |
+| App Web | `1:976446935708:web:f9912aa5dea65f57745359` (a chave de API sai daqui) |
+| App Android | `1:976446935708:android:fe2102940d4e9a16745359`, `com.dedonervoso.app`, SHA-1 e SHA-256 cadastrados |
+| Realtime Database | ainda não criado (fica para o duelo ao vivo) |
+
+O ID do projeto está em `gradle.properties` (`dedo.firebaseProjectId`). No ambiente de build só
+falta a chave, em `DEDO_FIREBASE_API_KEY`. Os passos 1 e 2 abaixo servem para montar um projeto
+do zero.
+
 ## 1. Criar o projeto
 
 1. Em <https://console.firebase.google.com>, **Adicionar projeto** → nome `Dedo Nervoso`.
@@ -36,8 +51,8 @@ No menu do ambiente (barra de título da sessão) → **Edit** → variáveis de
 
 | Variável | Valor |
 |---|---|
-| `DEDO_FIREBASE_PROJECT_ID` | o ID do projeto |
 | `DEDO_FIREBASE_API_KEY` | a Chave de API da Web |
+| `DEDO_FIREBASE_PROJECT_ID` | opcional: só para usar outro projeto que não o de `gradle.properties` |
 | `DEDO_KEYSTORE_B64` | a chave de assinatura (do arquivo `dedo-nervoso-assinatura.txt`) |
 | `DEDO_KEYSTORE_PASSWORD` | a senha dessa chave (mesmo arquivo) |
 
@@ -46,15 +61,22 @@ ligado ao seu projeto e assinado com a mesma chave (as atualizações instalam p
 
 ## 4. Testar
 
-Para conferir o projeto sem o celular, você precisa de Node.js e do login do Firebase CLI
+Para conferir o projeto sem o celular, você precisa de Node.js e da chave. A chave pode vir de
+`DEDO_FIREBASE_API_KEY` no ambiente ou do login do Firebase CLI
 (`npx --yes firebase-tools@13 login`). Com isso, rode:
 
 ```bash
-bash firebase/verify-online.sh ID_DO_PROJETO
+bash firebase/verify-online.sh dedo-nervoso-7284
 ```
 
-O script faz um login anônimo de teste e testa as regras do jeito que o jogo usa. Depois roda a
-consulta do ranking e apaga o que criou. A chave de API não aparece na saída.
+O script cobre tudo o que o jogo usa:
+
+- faz um login anônimo de teste e renova a sessão;
+- testa as regras;
+- grava e lê os rankings de amigos, global e da semana;
+- apaga o que criou.
+
+As respostas ficam só na memória e a chave de API não aparece na saída.
 
 Instale o APK novo, abra **Ranking → Online → Ativar ranking online**. No console do
 Firebase, em Firestore, devem aparecer as coleções `players` e `codes`.

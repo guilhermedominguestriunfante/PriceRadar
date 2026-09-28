@@ -3,6 +3,23 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não lançado] — 1.1.1
+
+Primeira versão com o online ligado (versionCode 3), no projeto Firebase `dedo-nervoso-7284`
+(Firestore em São Paulo, login anônimo). O online passa a exigir esta versão.
+
+### Online
+- O APK sai com o projeto do Firebase configurado: ranking Global, da Semana e entre Amigos
+  funcionando de verdade.
+- `publishRelease` se recusa a publicar um APK sem a configuração do online
+  (`-PofflineRelease=true` para uma exceção).
+
+### Ferramentas
+- `firebase/verify-online.sh` confere o projeto real do jeito que o jogo usa: login, renovação
+  da sessão, regras, rankings (amigos, global, semana) e limpeza. A chave vem do ambiente ou do
+  Firebase CLI e não aparece na saída.
+- Os testes nunca falam com o projeto real, mesmo num build que tenha a chave.
+
 ## [1.1.0] — 2026-09-28 · Dedo Nervoso
 
 Novo nome e primeira versão online (`com.dedonervoso.app`, versionCode 2). É um app novo para o

@@ -18,8 +18,8 @@ androidApk {
     resourcesSdk.set(34)
     minSdk.set(26)
     targetSdk.set(35)
-    versionCode.set(2)
-    versionName.set("1.1.0")
+    versionCode.set(3)
+    versionName.set("1.1.1")
     apkBaseName.set("dedo-nervoso")
     proguardFiles.from("proguard-rules.pro")
 }
@@ -70,10 +70,12 @@ val generateSfx = tasks.register<JavaExec>("generateSfx") {
 }
 androidApk.extraAssetDirs.from(generateSfx.map { layout.buildDirectory.dir("generated/assets").get() })
 
-// Online (Firebase) settings come from the environment at build time — DEDO_FIREBASE_PROJECT_ID and
-// DEDO_FIREBASE_API_KEY (the project's public Web API key) — and ship as assets/config/online.properties.
-// Without them the build still works and online features say they're unavailable.
-val onlineProjectId = providers.environmentVariable("DEDO_FIREBASE_PROJECT_ID").orElse("")
+// Online (Firebase) settings ship as assets/config/online.properties: the project ID
+// (dedo.firebaseProjectId in gradle.properties, or DEDO_FIREBASE_PROJECT_ID) and the project's public
+// Web API key, which only comes from the environment (DEDO_FIREBASE_API_KEY) and is never committed.
+// Without the key the build still works and online features say they're unavailable.
+val onlineProjectId = providers.environmentVariable("DEDO_FIREBASE_PROJECT_ID")
+    .orElse(providers.gradleProperty("dedo.firebaseProjectId")).orElse("")
 val onlineApiKey = providers.environmentVariable("DEDO_FIREBASE_API_KEY").orElse("")
 val generateOnlineConfig = tasks.register("generateOnlineConfig") {
     group = "build"
@@ -86,7 +88,9 @@ val generateOnlineConfig = tasks.register("generateOnlineConfig") {
         val file = outDir.get().file("config/online.properties").asFile
         file.parentFile.mkdirs()
         file.writeText("projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\n")
-        if (onlineProjectId.get().isBlank()) logger.lifecycle("Online disabled in this build (DEDO_FIREBASE_PROJECT_ID not set).")
+        if (onlineProjectId.get().isBlank() || onlineApiKey.get().isBlank()) {
+            logger.lifecycle("Online disabled in this build (DEDO_FIREBASE_API_KEY not set).")
+        }
     }
 }
 androidApk.extraAssetDirs.from(generateOnlineConfig.map { layout.buildDirectory.dir("generated/online-assets").get() })
@@ -124,6 +128,8 @@ tasks.test {
     systemProperty("robolectric.logging.enabled", "false")
     // Screenshots of rendered screens are written here by UI tests.
     systemProperty("dedo.screenshots", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
+    // The versionCode the app should report (update tests are relative to it).
+    systemProperty("dedo.versionCode", androidApk.versionCode.get())
     testLogging {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -205,6 +211,9 @@ tasks.register("publishRelease") {
     val appId = androidApk.applicationId
     // Online play requires the newest version unless a lower floor is given (-PminOnlineVersionCode=N).
     val minOnline = providers.gradleProperty("minOnlineVersionCode").map { it.toInt() }.orElse(code)
+    // Releases are online builds; an offline one needs -PofflineRelease=true.
+    val online = onlineProjectId.zip(onlineApiKey) { id, key -> id.isNotBlank() && key.isNotBlank() }
+    val offlineAllowed = providers.gradleProperty("offlineRelease").map { it.toBoolean() }.orElse(false)
     val apksigner = provider { dedonervoso.gradle.AndroidSdk.locate(project).apksigner }
     inputs.file(apkFile)
     inputs.file(notesFile)
@@ -212,6 +221,9 @@ tasks.register("publishRelease") {
     inputs.property("minOnlineVersionCode", minOnline)
     outputs.dir(releaseDir)
     doLast {
+        if (!online.get() && !offlineAllowed.get()) {
+            throw GradleException("Refusing to publish a release without online settings: set DEDO_FIREBASE_API_KEY (or pass -PofflineRelease=true).")
+        }
         val apk = apkFile.get().asFile
         val verify = ProcessBuilder(apksigner.get().absolutePath, "verify", "--print-certs", apk.absolutePath)
             .redirectErrorStream(true).start()

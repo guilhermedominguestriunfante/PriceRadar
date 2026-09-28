@@ -19,7 +19,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(qualifiers = "w411dp-h891dp-xhdpi")
 class UpdateFlowTest {
 
-    private fun manifest(code: Int, min: Int, name: String) = """
+    private fun manifest(code: Long, min: Long, name: String) = """
         {"schema":1,"app":"com.dedonervoso.app","versionCode":$code,"versionName":"$name","minOnlineVersionCode":$min,
          "apkUrl":"https://example.org/dedo-nervoso.apk","size":2000000,"sha256":"00",
          "notes":{"pt":["Duelo ao vivo","Itens de sabotagem"],"en":["Live duel","Sabotage items"]}}
@@ -28,10 +28,11 @@ class UpdateFlowTest {
     @Test
     fun newVersionIsAnnouncedAndDownloadOpensTheApk() {
         val h = GameHarness()
-        h.server.routes["/release/version.json"] = { 200 to manifest(3, 3, "1.2.0") }
+        val next = GameHarness.buildVersion + 1
+        h.server.routes["/release/version.json"] = { 200 to manifest(next, next, "1.2.0") }
         h.launch(GameHarness.progressedSave())
         val app = h.app
-        assertEquals("installed version comes from the manifest", 2L, app.updates.version.code)
+        assertEquals("installed version comes from the manifest", GameHarness.buildVersion, app.updates.version.code)
         h.awaitCondition("update check") { app.updates.release != null }
         assertEquals(UpdateState.REQUIRED_FOR_ONLINE, app.updates.state)
         assertTrue(!app.updates.onlineAllowed)
@@ -53,7 +54,8 @@ class UpdateFlowTest {
     @Test
     fun sameVersionShowsNothingAndOnlineStaysOpen() {
         val h = GameHarness()
-        h.server.routes["/release/version.json"] = { 200 to manifest(2, 2, "1.1.0") }
+        val installed = GameHarness.buildVersion
+        h.server.routes["/release/version.json"] = { 200 to manifest(installed, installed, "atual") }
         h.launch(GameHarness.progressedSave())
         h.awaitCondition("update check") { h.app.updates.release != null }
         h.frames(10)

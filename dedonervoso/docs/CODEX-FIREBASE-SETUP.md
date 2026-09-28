@@ -1,5 +1,8 @@
 # Tarefa para o Codex: configurar o Firebase do Dedo Nervoso
 
+> **Status:** feito em 28/09/2026, no projeto `dedo-nervoso-7284`. Os detalhes estão em
+> [FIREBASE.md](FIREBASE.md). Este roteiro continua valendo para montar um projeto do zero.
+
 > **Para você, antes de chamar o Codex (5 minutos)**
 >
 > 1. Instale no seu computador o **Node.js LTS** (18 ou mais novo) e o **Git**.
@@ -58,7 +61,8 @@ Leva uns 15 minutos.
 ### Acessos de que você precisa
 
 1. **Terminal no computador da pessoa usuária** com Node.js 18+ (`npx`), `git`, `curl` e `bash`.
-   No Windows, use o Git Bash que vem com o Git (`"C:\Program Files\Git\bin\bash.exe"`).
+   No Windows, use o `bash.exe` do Git. Ele costuma ficar em `C:\Program Files\Git\bin\` ou
+   em `%LOCALAPPDATA%\Programs\Git\bin\`.
 2. **Internet nos comandos**, para `registry.npmjs.org`, `github.com` e `*.googleapis.com`. Se o
    sandbox bloquear a rede ou a gravação em `~/.npm` e `~/.config`, peça aprovação para rodar o
    comando fora do sandbox.
@@ -194,14 +198,15 @@ bash verify-online.sh PROJECT_ID
 
 O script:
 
-- faz um login anônimo de teste;
+- faz um login anônimo de teste e renova a sessão;
 - testa as regras do jeito que o jogo usa;
-- roda a consulta do ranking;
+- grava e lê os rankings de amigos, global e da semana;
 - apaga tudo o que criou.
 
-A chave de API é lida pelo Firebase CLI e não aparece na saída.
+As respostas ficam só na memória: nada é gravado em disco. A chave de API é lida pelo Firebase
+CLI e não aparece na saída.
 
-Resultado esperado: 11 linhas `OK` e `TUDO CERTO` no fim. Se aparecer `FALHOU`, siga a dica da
+Resultado esperado: todas as linhas `OK` e `TUDO CERTO` no fim. Se aparecer `FALHOU`, siga a dica da
 linha (quase sempre é o passo 2 que ainda não foi feito) e rode de novo. **Nunca mude as regras
 para passar no teste.**
 

@@ -98,7 +98,7 @@ servidor guarda apenas apelido, avatar, código de amigo, lista de amigos e reco
 dedonervoso/
 ├── core/       Kotlin puro (sem Android): motor, regras, progressão, save, áudio, textos, online
 ├── app/        Cliente Android: activity, renderização, telas, som, vibração, armazenamento
-├── tools/      Gerador dos efeitos sonoros (roda no build, grava WAVs em assets)
+├── tools/      Gerador dos efeitos sonoros (roda no build) e setup-cloud-toolchain.sh
 ├── testshim/   Substitutos mínimos de androidx.test para o Robolectric
 ├── buildSrc/   Plugin Gradle `dedonervoso.android-apk` que gera o APK com as ferramentas do SDK
 ├── firebase/   Regras do Firestore, emuladores e verify-online.sh
@@ -142,7 +142,10 @@ dedonervoso/
 Requisitos: **JDK 21**, Android SDK com `platforms/android-35` e `platforms/android-34`
 (os recursos são linkados contra a API 34) e build-tools com `aapt2`, `zipalign`,
 `apksigner` e `d8` (ou `dx`). Informe o SDK em `local.properties` (`sdk.dir=...`) ou
-em `ANDROID_HOME`. Ferramentas ausentes do SDK também são procuradas no `PATH`.
+em `ANDROID_HOME`. Ferramentas ausentes do SDK também são procuradas no `PATH`. Num
+container Ubuntu/Debian novo (por exemplo, uma sessão do Claude Code na nuvem), rode
+`bash tools/setup-cloud-toolchain.sh`. Ele instala o JDK e as ferramentas do Debian, baixa os
+`android.jar` e grava o `local.properties`.
 
 ```bash
 ./gradlew assembleDebug         # app/build/outputs/apk/debug/dedo-nervoso-debug.apk
@@ -158,9 +161,10 @@ em `ANDROID_HOME`. Ferramentas ausentes do SDK também são procuradas no `PATH`
 `.gitignore` e **nunca** devem ser versionados. `publishRelease` se recusa a publicar um APK
 assinado com a chave de debug.
 
-**Online**: `DEDO_FIREBASE_PROJECT_ID` e `DEDO_FIREBASE_API_KEY` no ambiente de build (veja
-[docs/FIREBASE.md](docs/FIREBASE.md)). Sem elas o build funciona e o online aparece como
-indisponível.
+**Online**: o projeto (`dedo-nervoso-7284`) está em `gradle.properties`. A chave de API da Web
+vem de `DEDO_FIREBASE_API_KEY` no ambiente de build e nunca é versionada (veja
+[docs/FIREBASE.md](docs/FIREBASE.md)). Sem a chave o build funciona, o online aparece como
+indisponível, e `publishRelease` se recusa a publicar.
 
 **Por que não AGP / Compose?** O ambiente em que o projeto foi criado não acessava o
 repositório Maven do Google (dl.google.com), então o plugin em `buildSrc` executa
@@ -180,7 +184,10 @@ escolha natural. A migração para o AGP está no [ROADMAP](ROADMAP.md).
 - Online: testes de integração contra os **emuladores oficiais do Firebase** com as regras reais
   (contas, códigos, rankings, amigos, regras recusando trapaças) e o fluxo completo no app
   (ativar, ranking global, adicionar amigo, partida publicada no ranking da semana, versão
-  obrigatória). Pulados quando os emuladores não estão rodando.
+  obrigatória). Pulados quando os emuladores não estão rodando. Os testes nunca falam com o
+  projeto real, mesmo num build que tenha a chave.
+- `firebase/verify-online.sh <projeto>` — confere o **projeto real** do jeito que o jogo usa
+  (login, renovação da sessão, regras, rankings, limpeza), sem mostrar a chave.
 - `:app:releaseSmokeTest` — executa o **bytecode de release** (saída otimizada e ofuscada
   do ProGuard) jogando uma sessão inteira só por toques e confere o save em disco.
 

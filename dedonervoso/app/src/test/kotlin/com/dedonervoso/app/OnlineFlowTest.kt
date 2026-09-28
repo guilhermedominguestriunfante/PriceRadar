@@ -120,8 +120,9 @@ class OnlineFlowTest {
     @Test
     fun onlineWaitsForTheUpdateWhenRequired() {
         val h = GameHarness()
+        val next = GameHarness.buildVersion + 1
         h.server.routes["/release/version.json"] = {
-            200 to """{"app":"com.dedonervoso.app","versionCode":3,"versionName":"1.2.0","minOnlineVersionCode":3,"apkUrl":"https://example.org/a.apk"}"""
+            200 to """{"app":"com.dedonervoso.app","versionCode":$next,"versionName":"1.2.0","minOnlineVersionCode":$next,"apkUrl":"https://example.org/a.apk"}"""
         }
         val save = GameHarness.progressedSave()
         save.onlineEnabled = true
@@ -139,10 +140,10 @@ class OnlineFlowTest {
     }
 
     @Test
-    fun buildsWithoutFirebaseSettingsSayOnlineIsUnavailable() {
+    fun withoutFirebaseSettingsOnlineSaysUnavailable() {
         val save = GameHarness.progressedSave()
         save.onlineEnabled = true
-        val h = GameHarness().launch(save)   // unit-test builds carry no Firebase project
+        val h = GameHarness().launch(save)   // the harness hides the build's Firebase project
         assertEquals(Online.Status.UNAVAILABLE, h.app.online.status)
         h.click(h.app.strings.ranking, 60)
         h.click(h.app.strings.onlineTab, 20)

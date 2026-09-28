@@ -6,6 +6,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import com.dedonervoso.core.engine.GameState
+import com.dedonervoso.core.online.FirebaseConfig
 import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.core.save.SaveData
 import com.dedonervoso.app.platform.Endpoints
@@ -39,6 +40,9 @@ class GameHarness {
         ShadowChoreographer.setFrameDelay(Duration.ofMillis(16))
         if (seed != null) saveFile.writeText(SaveCodec.encode(seed))
         Endpoints.releaseManifest = server.url("/release/version.json")
+        // Builds made with DEDO_FIREBASE_* set carry the real project: tests never talk to it.
+        // Online tests point this at the emulators or the fake server before launching.
+        if (Endpoints.firebaseOverride == null) Endpoints.firebaseOverride = FirebaseConfig("", "")
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         frames(40)
         // The opening is skippable by a touch (as players do); flows start from what follows.
@@ -145,6 +149,9 @@ class GameHarness {
     }
 
     companion object {
+        /** versionCode of this build (app/build.gradle.kts), as the installed app should report it. */
+        val buildVersion: Long get() = System.getProperty("dedo.versionCode")?.toLong() ?: error("dedo.versionCode not set")
+
         /** A save with some progress so every menu has content. */
         fun progressedSave(): SaveData {
             val d = SaveData()
