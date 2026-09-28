@@ -1,5 +1,6 @@
 package com.dedonervoso.core.save
 
+import com.dedonervoso.core.online.OnlineService
 import com.dedonervoso.core.progression.Mission
 import com.dedonervoso.core.progression.MissionKind
 import com.dedonervoso.core.progression.RankEntry
@@ -53,6 +54,13 @@ object SaveCodec {
             "onboardingDone" to d.onboardingDone,
             "seenIntros" to d.seenIntros.map { it.name }.sorted(),
             "release" to mapOf("manifest" to d.releaseCache, "url" to d.releaseManifestUrl, "checkedAt" to d.releaseCheckedAt),
+            "online" to d.online.let {
+                linkedMapOf(
+                    "enabled" to d.onlineEnabled, "uid" to it.uid, "token" to it.refreshToken, "code" to it.code,
+                    "friends" to it.friends, "bestScore" to it.bestScore, "bestTaps" to it.bestTaps, "bestTps10" to it.bestTps10,
+                    "bestStage" to it.bestStage, "weekId" to it.weekId, "weekBest" to it.weekBest, "dirty" to it.dirty,
+                )
+            },
         ),
     )
 
@@ -134,6 +142,19 @@ object SaveCodec {
         d.releaseCache = release.string("manifest").take(MAX_RELEASE_JSON)
         d.releaseManifestUrl = release.string("url").takeIf { it.startsWith("https://") } ?: ""
         d.releaseCheckedAt = release.long("checkedAt").coerceAtLeast(0L)
+        val online = o.obj("online")
+        d.onlineEnabled = online.bool("enabled")
+        d.online.uid = online.string("uid").take(128)
+        d.online.refreshToken = online.string("token").take(4_096)
+        d.online.code = online.string("code").takeIf { OnlineService.normalizeCode(it) == it } ?: ""
+        d.online.friends += online.list("friends").filterIsInstance<String>().filter { it.length in 1..128 }.distinct().take(OnlineService.MAX_FRIENDS)
+        d.online.bestScore = online.long("bestScore").coerceIn(0L, MAX_SCORE)
+        d.online.bestTaps = online.long("bestTaps").coerceIn(0L, 3_000L)
+        d.online.bestTps10 = online.long("bestTps10").coerceIn(0L, 250L)
+        d.online.bestStage = online.long("bestStage").coerceIn(0L, MAX_STAGE.toLong())
+        d.online.weekId = online.string("weekId").take(8)
+        d.online.weekBest = online.long("weekBest").coerceIn(0L, MAX_SCORE)
+        d.online.dirty = online.bool("dirty")
         for (name in o.list("seenIntros")) {
             Mechanic.values().firstOrNull { it.name == name }?.let { d.seenIntros += it }
         }

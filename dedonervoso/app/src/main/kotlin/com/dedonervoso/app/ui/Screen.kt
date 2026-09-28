@@ -73,8 +73,8 @@ abstract class Screen(protected val app: GameApp) {
         relayout()
     }
     open fun onExit() {}
-    /** Update information changed (a check finished); screens that show it re-layout. */
-    open fun onUpdatesChanged() {}
+    /** Background work (update check, online sync) brought news; screens that show it re-layout. */
+    open fun onBackgroundUpdate() {}
     open fun onAppPause() {}
     open fun onAppResume() {}
 

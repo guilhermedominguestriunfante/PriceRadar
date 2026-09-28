@@ -17,12 +17,18 @@ class SettingsScreen(app: GameApp) : Screen(app) {
     private lateinit var scroll: ScrollArea
     private var savedOffset = 0f
 
-    private class Toggle(val label: String, val icon: Icon, val get: (Settings) -> Boolean, val set: (Settings, Boolean) -> Unit) {
+    private class Toggle(val label: String, val icon: Icon, val get: () -> Boolean, val tap: () -> Unit) {
         val row = RectF()
         var anim = 0f
     }
 
     private val toggles = ArrayList<Toggle>()
+
+    private fun setting(label: String, icon: Icon, get: (Settings) -> Boolean, set: (Settings, Boolean) -> Unit) =
+        Toggle(label, icon, { get(app.settings) }) {
+            set(app.settings, !get(app.settings))
+            app.settingsChanged()
+        }
     private var aboutTop = 0f
     private val langRow = RectF()
 
@@ -31,20 +37,21 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         scroll = scrollArea()
         scroll.rect.set(safe.left, top, safe.right, safe.bottom)
         toggles.clear()
-        toggles += Toggle(s.music, Icon.MUSIC, { it.music }, { st, v -> st.music = v })
-        toggles += Toggle(s.sfx, Icon.SOUND, { it.sfx }, { st, v -> st.sfx = v })
-        toggles += Toggle(s.vibration, Icon.VIBRATION, { it.vibration }, { st, v -> st.vibration = v })
-        toggles += Toggle(s.reduceEffects, Icon.SPARKLE, { it.reduceEffects }, { st, v -> st.reduceEffects = v })
-        toggles += Toggle(s.showFps, Icon.BOLT, { it.showFps }, { st, v -> st.showFps = v })
+        toggles += setting(s.music, Icon.MUSIC, { it.music }, { st, v -> st.music = v })
+        toggles += setting(s.sfx, Icon.SOUND, { it.sfx }, { st, v -> st.sfx = v })
+        toggles += setting(s.vibration, Icon.VIBRATION, { it.vibration }, { st, v -> st.vibration = v })
+        toggles += setting(s.reduceEffects, Icon.SPARKLE, { it.reduceEffects }, { st, v -> st.reduceEffects = v })
+        toggles += setting(s.showFps, Icon.BOLT, { it.showFps }, { st, v -> st.showFps = v })
+        // Online is opt-in: switching it on asks first (what becomes visible to others).
+        toggles += Toggle(s.onlineRanking, Icon.GLOBE, { app.online.enabled }) {
+            if (app.online.enabled) app.online.setEnabled(false) else app.enableOnlineWithConsent { relayout() }
+        }
         var y = scroll.rect.top + 4f * u
         val rowH = 58f * u
         for (t in toggles) {
             t.row.set(scroll.rect.left + 4f * u, y, scroll.rect.right - 4f * u, y + rowH - 8f * u)
-            t.anim = if (t.get(app.settings)) 1f else 0f
-            val b = button("", null, Button.Style.GHOST) {
-                t.set(app.settings, !t.get(app.settings))
-                app.settingsChanged()
-            }
+            t.anim = if (t.get()) 1f else 0f
+            val b = button("", null, Button.Style.GHOST) { t.tap() }
             b.scroll = scroll
             b.rect.set(t.row)
             y += rowH
@@ -68,6 +75,12 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         val reset = button(s.resetProgress, Icon.TRASH, Button.Style.DANGER, Palette.RED) { confirmReset() }
         reset.scroll = scroll
         reset.rect.set(scroll.rect.left + 4f * u, y, scroll.rect.right - 4f * u, y + 50f * u)
+        if (app.online.account.exists) {
+            y += 62f * u
+            val del = button(s.deleteOnline, Icon.GLOBE, Button.Style.DANGER, Palette.RED) { app.confirmDeleteOnline() }
+            del.scroll = scroll
+            del.rect.set(scroll.rect.left + 4f * u, y, scroll.rect.right - 4f * u, y + 50f * u)
+        }
         y += 86f * u
         aboutTop = y
         y += 150f * u
@@ -100,7 +113,7 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         savedOffset = scroll.offset
         ui.background.update(dt * 0.5f)
         for (t in toggles) {
-            val target = if (t.get(app.settings)) 1f else 0f
+            val target = if (t.get()) 1f else 0f
             t.anim += (target - t.anim) * kotlin.math.min(1f, dt * 14f)
         }
     }
@@ -116,7 +129,7 @@ class SettingsScreen(app: GameApp) : Screen(app) {
             ui.neon.panel(c, t.row, 14f * u, Palette.withAlpha(Palette.PANEL, 0.9f), Palette.withAlpha(Palette.CYAN, 0.25f + 0.4f * t.anim), 0.2f)
             ui.icons.draw(c, t.icon, t.row.left + 28f * u, t.row.centerY(), 20f * u, Palette.mix(Palette.DIM, Palette.CYAN, t.anim))
             c.drawText(t.label, t.row.left + 52f * u, t.row.centerY() + 6f * u, lp)
-            app.buttons.toggle(c, t.row, t.get(app.settings), t.anim)
+            app.buttons.toggle(c, t.row, t.get(), t.anim)
         }
         ui.neon.panel(c, langRow, 14f * u, Palette.withAlpha(Palette.PANEL, 0.9f), Palette.withAlpha(Palette.CYAN, 0.3f), 0.2f)
         ui.icons.draw(c, Icon.GLOBE, langRow.left + 28f * u, langRow.centerY(), 20f * u, Palette.CYAN)
@@ -136,7 +149,7 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         drawButtons(c)
     }
 
-    override fun onUpdatesChanged() = relayout()
+    override fun onBackgroundUpdate() = relayout()
 
     private fun checkUpdates() {
         app.updates.check(force = true) { ok ->

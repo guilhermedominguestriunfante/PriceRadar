@@ -355,6 +355,17 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
 
     fun settingsChanged() = changed()
 
+    /** Stores what a background online sync learned (identity, code, friends, synced bests). */
+    fun updateOnline(account: com.dedonervoso.core.online.OnlineAccount) {
+        save.online.set(account)
+        changed()
+    }
+
+    fun setOnlineEnabled(enabled: Boolean) {
+        save.onlineEnabled = enabled
+        changed()
+    }
+
     /** Remembers the last release manifest seen (see [SaveData.releaseCache]). */
     fun recordRelease(manifestJson: String, manifestUrl: String, checkedAt: Long) {
         save.releaseCache = manifestJson
@@ -365,7 +376,12 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
 
     /** Wipes progress but keeps settings and identity (spec §51, confirmed by the UI). */
     fun resetProgress() {
-        val fresh = SaveData(profile = save.profile, settings = save.settings)
+        // Progress starts over; identity, preferences and the online account stay.
+        val fresh = SaveData(
+            profile = save.profile, settings = save.settings,
+            releaseCache = save.releaseCache, releaseManifestUrl = save.releaseManifestUrl, releaseCheckedAt = save.releaseCheckedAt,
+            onlineEnabled = save.onlineEnabled, online = save.online,
+        )
         fresh.onboardingDone = true
         save = fresh
         ensureMissions()

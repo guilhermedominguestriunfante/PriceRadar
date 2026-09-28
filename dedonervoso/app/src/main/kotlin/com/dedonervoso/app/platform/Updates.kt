@@ -19,8 +19,16 @@ object Endpoints {
     const val DEFAULT_RELEASE_MANIFEST =
         "https://raw.githubusercontent.com/guilhermedominguestriunfante/PriceRadar/main/dedonervoso/release/version.json"
 
+    /** Stable download link of the newest APK (used in invites before any manifest was fetched). */
+    const val DEFAULT_APK_URL =
+        "https://raw.githubusercontent.com/guilhermedominguestriunfante/PriceRadar/main/dedonervoso/release/dedo-nervoso.apk"
+
     @Volatile
     var releaseManifest: String = DEFAULT_RELEASE_MANIFEST
+
+    /** Replaces the build's Firebase settings (tests use the local emulators). */
+    @Volatile
+    var firebaseOverride: com.dedonervoso.core.online.FirebaseConfig? = null
 }
 
 /** The installed version, from the package manager (single source: app/build.gradle.kts). */

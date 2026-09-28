@@ -379,6 +379,7 @@ class PlayScreen(
         val r = result ?: return
         result = null
         val outcome = app.progression.applyMatch(r, stage, daily)
+        app.online.submit(outcome)
         app.host.replace(ResultScreen(app, outcome, dailyTitle))
     }
 

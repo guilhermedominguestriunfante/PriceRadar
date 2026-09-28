@@ -1,6 +1,8 @@
 package com.dedonervoso.app
 
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Build
 import android.text.InputFilter
 import android.text.InputType
@@ -9,13 +11,16 @@ import android.widget.EditText
 import com.dedonervoso.core.audio.Sfx
 import com.dedonervoso.core.i18n.Strings
 import com.dedonervoso.core.online.JavaNetHttp
+import com.dedonervoso.core.online.OnlineFailure
 import com.dedonervoso.core.online.UpdateState
 import com.dedonervoso.core.progression.AchievementDef
 import com.dedonervoso.core.progression.Progression
 import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.app.platform.AppVersion
 import com.dedonervoso.app.platform.Haptics
+import com.dedonervoso.app.platform.Endpoints
 import com.dedonervoso.app.platform.Links
+import com.dedonervoso.app.platform.Online
 import com.dedonervoso.app.platform.MusicPlayer
 import com.dedonervoso.app.platform.SaveStore
 import com.dedonervoso.app.platform.SfxPlayer
@@ -50,6 +55,7 @@ class GameApp(val activity: MainActivity) {
     /** Single background thread for network calls (results are posted back to the UI thread). */
     val net: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "dedo-net").apply { isDaemon = true } }
     val updates = Updates(progression, AppVersion.of(activity), activity.packageName, JavaNetHttp(), net)
+    val online = Online(progression, updates, Online.loadConfig(activity), JavaNetHttp(), net, updates.version.code)
 
     var strings: Strings = resolveStrings()
         private set
@@ -59,13 +65,15 @@ class GameApp(val activity: MainActivity) {
 
     init {
         progression.onChanged = { store.scheduleSave(progression.save) }
-        updates.onChange = { host.current?.onUpdatesChanged() }
+        updates.onChange = { host.current?.onBackgroundUpdate() }
+        online.onChange = { host.current?.onBackgroundUpdate() }
         applySettings()
     }
 
     fun start() {
         host.setRoot(IntroScreen(this) { enterGame() })
-        updates.check()
+        // Online waits for the version check, so an outdated install never reaches the server.
+        updates.check { online.connect() }
     }
 
     /** After the opening: Home, with the onboarding on top on the first run. */
@@ -138,6 +146,93 @@ class GameApp(val activity: MainActivity) {
             Dialog(
                 strings.updateTitle(r.versionName), message,
                 listOf(strings.later to {}, strings.download to { Links.open(activity, r.apkUrl, strings.linkFailed) }),
+            ),
+        )
+    }
+
+    /** Asks before going online (what becomes visible), then signs in. */
+    fun enableOnlineWithConsent(done: () -> Unit = {}) {
+        host.showDialog(
+            Dialog(
+                strings.onlineConsentTitle, strings.onlineConsentText,
+                listOf(
+                    strings.notNow to {},
+                    strings.enable to {
+                        online.setEnabled(true) { ok ->
+                            if (!ok && online.status != Online.Status.READY) {
+                                host.toast(strings.onlineRanking, strings.onlineError, Icon.GLOBE, Palette.ORANGE)
+                            }
+                            done()
+                        }
+                    },
+                ),
+            ),
+        )
+    }
+
+    /** Friend code input; the friend is added in the background and announced with a toast. */
+    fun addFriendDialog() {
+        val input = EditText(activity).apply {
+            hint = strings.friendCodeHint
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            filters = arrayOf(InputFilter.LengthFilter(9))
+            setSingleLine()
+        }
+        val theme = if (Build.VERSION.SDK_INT >= 29) android.R.style.Theme_DeviceDefault_Dialog_Alert else android.R.style.Theme_Material_Dialog_Alert
+        AlertDialog.Builder(activity, theme)
+            .setTitle(strings.addFriend)
+            .setView(input)
+            .setPositiveButton(strings.ok) { _, _ ->
+                activity.hideSystemBars()
+                addFriend(input.text.toString())
+            }
+            .setNegativeButton(strings.cancel) { _, _ -> activity.hideSystemBars() }
+            .setOnCancelListener { activity.hideSystemBars() }
+            .show()
+    }
+
+    fun addFriend(code: String) {
+        online.addFriend(code) { nick, failure ->
+            when {
+                nick != null -> {
+                    sfx.play(Sfx.ACHIEVEMENT)
+                    host.toast(strings.friendAdded(nick), strings.friendsTab, Icon.USER, Palette.GREEN)
+                }
+                failure == OnlineFailure.NOT_FOUND -> host.toast(strings.codeNotFound, code.uppercase(), Icon.INFO, Palette.ORANGE)
+                failure == OnlineFailure.CONFLICT -> host.toast(strings.ownCode, online.friendCode, Icon.INFO, Palette.ORANGE)
+                else -> host.toast(strings.addFriend, strings.onlineError, Icon.GLOBE, Palette.ORANGE)
+            }
+        }
+    }
+
+    /** Shares the friend code and the download link (WhatsApp or any app, via the system sheet). */
+    fun shareInvite() {
+        val url = updates.release?.apkUrl ?: Endpoints.DEFAULT_APK_URL
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, strings.inviteText(online.friendCode.ifEmpty { "—" }, url))
+        }
+        try {
+            activity.startActivity(Intent.createChooser(send, strings.invite))
+        } catch (e: ActivityNotFoundException) {
+            host.toast(strings.invite, strings.linkFailed, Icon.INFO, Palette.ORANGE)
+        }
+    }
+
+    fun confirmDeleteOnline() {
+        host.showDialog(
+            Dialog(
+                strings.deleteOnline, strings.deleteOnlineConfirm,
+                listOf(
+                    strings.cancel to {},
+                    strings.deleteOnline to {
+                        online.deleteAccount { ok ->
+                            if (ok) host.toast(strings.onlineDeleted, "", Icon.TRASH, Palette.RED)
+                            else host.toast(strings.deleteOnline, strings.onlineError, Icon.GLOBE, Palette.ORANGE)
+                        }
+                    },
+                ),
+                danger = true,
             ),
         )
     }

@@ -1,5 +1,6 @@
 package com.dedonervoso.core.save
 
+import com.dedonervoso.core.online.OnlineAccount
 import com.dedonervoso.core.progression.Mission
 import com.dedonervoso.core.progression.RankEntry
 import com.dedonervoso.core.progression.Stats
@@ -55,6 +56,9 @@ class SaveData(
     /** Where that manifest was found (it may have moved from the built-in address). */
     var releaseManifestUrl: String = "",
     var releaseCheckedAt: Long = 0L,
+    /** Online ranking and duels are opt-in; the account below is kept when switched off. */
+    var onlineEnabled: Boolean = false,
+    val online: OnlineAccount = OnlineAccount(),
 ) {
     val totalStars: Int get() = stageStars.values.sum()
     val highestCleared: Int get() = highestUnlocked - 1

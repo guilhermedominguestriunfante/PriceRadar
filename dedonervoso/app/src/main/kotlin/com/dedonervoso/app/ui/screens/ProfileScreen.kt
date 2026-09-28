@@ -21,6 +21,8 @@ class ProfileScreen(app: GameApp) : Screen(app) {
     private val levelBar = RectF()
     private var nameY = 0f
     private var statsTop = 0f
+    private val onlineCard = RectF()
+    private lateinit var achButton: Button
     private val stats = ArrayList<Pair<String, String>>()
     private var levelText = ""
     private var levelFraction = 0f
@@ -87,12 +89,53 @@ class ProfileScreen(app: GameApp) : Screen(app) {
         val ach = button(s.achievements, Icon.MEDAL, Button.Style.SECONDARY, Palette.GOLD) { app.host.push(AchievementsScreen(app)) }
         ach.scroll = scroll
         ach.rect.set(scroll.rect.left + 16f * u, y, scroll.rect.right - 16f * u, y + 50f * u)
-        y += 88f * u
+        achButton = ach
+        y += 66f * u
+        // Online card: friend code with invite / add friend, or the switch to turn online on.
+        val online = app.online
+        val codeShown = online.enabled && online.friendCode.isNotEmpty()
+        onlineCard.set(scroll.rect.left + 16f * u, y, scroll.rect.right - 16f * u, y + if (codeShown) 124f * u else 112f * u)
+        val half = (onlineCard.width() - 36f * u) / 2f
+        val by = onlineCard.bottom - 14f * u - 44f * u
+        if (codeShown) {
+            val inv = button(s.invite, Icon.NEXT, Button.Style.SECONDARY, Palette.MAGENTA) { app.shareInvite() }
+            inv.scroll = scroll
+            inv.rect.set(onlineCard.left + 12f * u, by, onlineCard.left + 12f * u + half, by + 44f * u)
+            val add = button(s.addFriend, Icon.USER, Button.Style.SECONDARY, Palette.GREEN) { app.addFriendDialog() }
+            add.scroll = scroll
+            add.rect.set(onlineCard.right - 12f * u - half, by, onlineCard.right - 12f * u, by + 44f * u)
+        } else if (!online.enabled) {
+            val on = button(s.enableOnline, Icon.GLOBE, Button.Style.SECONDARY, Palette.GREEN) { app.enableOnlineWithConsent() }
+            on.scroll = scroll
+            on.rect.set(onlineCard.left + 12f * u, by, onlineCard.right - 12f * u, by + 44f * u)
+        }
+        y = onlineCard.bottom + 40f * u
         statsTop = y
         y += 30f * u + stats.size * 34f * u
         scroll.contentHeight = y - scroll.rect.top + 20f * u
         scroll.scrollTo(savedOffset)
     }
+
+    private fun drawOnlineCard(c: Canvas) {
+        val online = app.online
+        val tp = ui.style(ui.mediumPaint, 12f, Palette.DIM, Paint.Align.LEFT)
+        if (online.enabled && online.friendCode.isNotEmpty()) {
+            c.drawText(s.friendCode, onlineCard.left + 16f * u, onlineCard.top + 24f * u, tp)
+            val cp = ui.style(ui.displayPaint, 24f, Palette.CYAN, Paint.Align.LEFT)
+            ui.neon.glowText(c, online.friendCode, onlineCard.left + 16f * u, onlineCard.top + 56f * u, cp, Palette.withAlpha(Palette.CYAN, 0.6f), 8f * u)
+        } else {
+            val title = ui.style(ui.displayBoldPaint, 15f, Palette.WHITE, Paint.Align.LEFT)
+            val text = when {
+                !online.enabled -> s.onlineOffTitle
+                online.status == com.dedonervoso.app.platform.Online.Status.UNAVAILABLE -> s.onlineUnavailable
+                else -> s.connecting
+            }
+            ui.fitText(c, text, onlineCard.left + 16f * u, onlineCard.top + 30f * u, title, onlineCard.width() - 32f * u)
+            if (!online.enabled) ui.fitText(c, s.onlineRanking, onlineCard.left + 16f * u, onlineCard.top + 50f * u, tp, onlineCard.width() - 32f * u)
+        }
+    }
+
+    override fun onBackgroundUpdate() = relayout()
 
     override fun update(now: Long, dt: Float) {
         super.update(now, dt)
@@ -119,6 +162,7 @@ class ProfileScreen(app: GameApp) : Screen(app) {
         c.drawText(avatarHint, cx, avatarRect.bottom + 16f * u, hint)
         val np = ui.style(ui.displayPaint, 22f, Palette.WHITE, Paint.Align.CENTER)
         ui.fitText(c, save.profile.nickname, cx, nameY, np, width - 40f * u)
+        ui.neon.panel(c, onlineCard, 16f * u, Palette.withAlpha(Palette.PANEL, 0.9f), Palette.withAlpha(Palette.CYAN, 0.5f), 0.3f)
         drawButtons(c, scroll)
         // Level.
         val lp = ui.style(ui.displayBoldPaint, 15f, Palette.GREEN, Paint.Align.LEFT)
@@ -128,8 +172,8 @@ class ProfileScreen(app: GameApp) : Screen(app) {
         ui.neon.bar(c, levelBar, levelFraction, Palette.GREEN, Palette.CYAN)
         // Achievements count on the button.
         val cp = ui.style(ui.displayBoldPaint, 14f, Palette.GOLD, Paint.Align.RIGHT)
-        val achButton = buttons.last { it.scroll === scroll }
         c.drawText(achText, achButton.rect.right - 16f * u, achButton.rect.centerY() + 5f * u, cp)
+        drawOnlineCard(c)
         // Statistics sheet.
         val hp = ui.style(ui.displayPaint, 17f, Palette.CYAN, Paint.Align.LEFT)
         c.drawText(s.stats, scroll.rect.left + 16f * u, statsTop, hp)

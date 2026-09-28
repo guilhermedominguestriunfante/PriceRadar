@@ -41,7 +41,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
         app.progression.ensureMissions()
     }
 
-    override fun onUpdatesChanged() = relayout()
+    override fun onBackgroundUpdate() = relayout()
 
     override fun layout() {
         val w = width

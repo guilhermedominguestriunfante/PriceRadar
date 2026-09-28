@@ -175,6 +175,40 @@ abstract class Strings {
     abstract val upToDate: String
     abstract val updateCheckFailed: String
     abstract val linkFailed: String
+
+    // Online play (opt-in).
+    abstract val onlineTab: String
+    abstract val deviceTab: String
+    abstract val globalTab: String
+    abstract val friendsTab: String
+    abstract val metricPoints: String
+    abstract val metricTaps: String
+    abstract val onlineRanking: String
+    abstract val onlineOffTitle: String
+    abstract val onlineOffText: String
+    abstract val enableOnline: String
+    abstract val onlineConsentTitle: String
+    abstract val onlineConsentText: String
+    abstract val notNow: String
+    abstract val enable: String
+    abstract val onlineUnavailable: String
+    abstract val loading: String
+    abstract val onlineError: String
+    abstract val retry: String
+    abstract val friendCode: String
+    abstract val addFriend: String
+    abstract val invite: String
+    abstract val friendCodeHint: String
+    abstract fun friendAdded(nick: String): String
+    abstract val codeNotFound: String
+    abstract val ownCode: String
+    abstract val noFriendsYet: String
+    abstract val deleteOnline: String
+    abstract val deleteOnlineConfirm: String
+    abstract val onlineDeleted: String
+    abstract fun inviteText(code: String, url: String): String
+    abstract val you: String
+    abstract val connecting: String
     abstract val credits: String
     abstract val fontsCredit: String
     abstract val privacyNote: String

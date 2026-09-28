@@ -135,6 +135,8 @@ class GameFlowTest {
             s.profile to "34_profile", s.missions to "35_missions",
         )) {
             h.click(label, 60)
+            // The ranking opens on its ONLINE tab; the local results are under THIS DEVICE.
+            if (h.app.host.current is RankingScreen) h.click(s.deviceTab, 20)
             h.screenshot(name)
             // Layout runs again after onEnter loaded the data: lists are scrollable to their end
             // and the ranking's empty-state PLAY button is absent when there are results.
@@ -145,6 +147,7 @@ class GameFlowTest {
             if (screen is RankingScreen) {
                 assertTrue("no empty-state button with results", h.buttons().none { it.label == s.play })
                 assertTrue("ranking rows scroll", screen.scrollsForTest.single().contentHeight > screen.scrollsForTest.single().rect.height())
+                h.click(s.onlineTab, 10)
             }
             if (screen is ProfileScreen) {
                 val scroll = screen.scrollsForTest.single()

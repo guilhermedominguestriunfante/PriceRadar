@@ -70,6 +70,27 @@ val generateSfx = tasks.register<JavaExec>("generateSfx") {
 }
 androidApk.extraAssetDirs.from(generateSfx.map { layout.buildDirectory.dir("generated/assets").get() })
 
+// Online (Firebase) settings come from the environment at build time — DEDO_FIREBASE_PROJECT_ID and
+// DEDO_FIREBASE_API_KEY (the project's public Web API key) — and ship as assets/config/online.properties.
+// Without them the build still works and online features say they're unavailable.
+val onlineProjectId = providers.environmentVariable("DEDO_FIREBASE_PROJECT_ID").orElse("")
+val onlineApiKey = providers.environmentVariable("DEDO_FIREBASE_API_KEY").orElse("")
+val generateOnlineConfig = tasks.register("generateOnlineConfig") {
+    group = "build"
+    description = "Writes the Firebase project settings used by online play."
+    val outDir = layout.buildDirectory.dir("generated/online-assets")
+    inputs.property("projectId", onlineProjectId)
+    inputs.property("apiKeyDigest", onlineApiKey.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } })
+    outputs.dir(outDir)
+    doLast {
+        val file = outDir.get().file("config/online.properties").asFile
+        file.parentFile.mkdirs()
+        file.writeText("projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\n")
+        if (onlineProjectId.get().isBlank()) logger.lifecycle("Online disabled in this build (DEDO_FIREBASE_PROJECT_ID not set).")
+    }
+}
+androidApk.extraAssetDirs.from(generateOnlineConfig.map { layout.buildDirectory.dir("generated/online-assets").get() })
+
 // Robolectric resolves the Android framework jar offline from this configuration.
 val robolectricRuntime: Configuration by configurations.creating {
     isTransitive = false
