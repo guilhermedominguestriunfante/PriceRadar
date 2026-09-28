@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.security.MessageDigest
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.zip.ZipFile
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // Android application: rendering, input, audio, haptics and storage on top of :core.
@@ -239,6 +240,15 @@ tasks.register("publishRelease") {
         if (verify.waitFor() != 0) throw GradleException("apksigner could not verify $apk:\n$certs")
         if ("Android Debug" in certs) {
             throw GradleException("Refusing to publish a release signed with the debug key: set DEDO_KEYSTORE_B64 / DEDO_KEYSTORE_PASSWORD.")
+        }
+        // What a device looks up must be there, under the exact names it uses.
+        val entries = ZipFile(apk).use { zip -> zip.entries().toList().map { it.name } }
+        entries.firstOrNull { '\\' in it }?.let { throw GradleException("Refusing to publish: APK entry '$it' has a backslash (Android would not find it).") }
+        for (needed in listOf("classes.dex", "resources.arsc", "assets/fonts/display_black.ttf", "assets/sfx/tap1.wav")) {
+            if (needed !in entries) throw GradleException("Refusing to publish: $needed is missing from the APK.")
+        }
+        if (online.get() && "assets/config/online.properties" !in entries) {
+            throw GradleException("Refusing to publish: the APK has no assets/config/online.properties.")
         }
         val bytes = apk.readBytes()
         val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
