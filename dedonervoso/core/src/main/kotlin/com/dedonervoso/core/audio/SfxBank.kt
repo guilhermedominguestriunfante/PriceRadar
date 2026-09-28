@@ -18,7 +18,7 @@ enum class Sfx(val file: String) {
     UI_CLICK("ui_click"), UI_BACK("ui_back"), COUNT_BEEP("count_beep"),
     LEVEL_UP("level_up"), ACHIEVEMENT("achievement"), STAR_1("star1"), STAR_2("star2"), STAR_3("star3"),
     TIME_BONUS("time_bonus"), SHIELD("shield"), ZONE_SPAWN("zone_spawn"), ZONE_POP("zone_pop"),
-    GOLDEN("golden"), REFLEX_READY("reflex_ready"),
+    GOLDEN("golden"), REFLEX_READY("reflex_ready"), INTRO("intro"),
 }
 
 /**
@@ -317,6 +317,21 @@ object SfxBank {
             tone(0.07f, 0.3f, 1319f, wave = Wave.SQUARE, amp = 0.2f, decay = 0.12f)
             sparkle(this, 0.05f, 16, 0.03f)
             lowPass(7000f)
+        }.finish(-3f)
+        Sfx.INTRO -> Mix(1.2f).apply {
+            // The fingertip lands: a deep thump with a click on top.
+            tone(0f, 0.35f, 150f, 48f, amp = 0.7f, attack = 0.002f, decay = 0.12f, glide = 0.12f)
+            noise(0f, 0.05f, 0.35f, lp = 3000f, decay = 0.02f)
+            tapLayers(this, 1300f)
+            // Nervous electric buzz: squares with a fast, uneven vibrato.
+            tone(0.08f, 0.5f, hz(52), wave = Wave.SQUARE, amp = 0.12f, attack = 0.01f, decay = 0.2f, vibratoHz = 18f, vibratoDepth = 0.03f)
+            tone(0.08f, 0.5f, hz(59), wave = Wave.SQUARE, amp = 0.08f, attack = 0.01f, decay = 0.2f, vibratoHz = 23f, vibratoDepth = 0.03f)
+            // Neon chord stab as the name lands.
+            for (n in intArrayOf(64, 67, 71, 76)) {
+                tone(0.1f, 1.0f, hz(n), wave = Wave.SAW, amp = 0.12f, attack = 0.006f, decay = 0.45f)
+            }
+            sparkle(this, 0.12f, 8, 0.04f)
+            lowPass(6500f, 2500f, q = 1.2f, sweep = 0.8f)
         }.finish(-3f)
         Sfx.REFLEX_READY -> Mix(0.24f).apply {
             tone(0f, 0.24f, 440f, amp = 0.35f, attack = 0.01f, decay = 0.12f)

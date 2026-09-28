@@ -45,6 +45,9 @@ class UiKit(context: Context) {
     val semiPaint = textPaint(fonts.textSemi, 20f, Palette.TEXT, Paint.Align.LEFT, 0.02f)
     val mediumPaint = textPaint(fonts.textMedium, 20f, Palette.DIM, Paint.Align.LEFT, 0.02f)
 
+    /** Wordmark and glove-hand mark (Home logo, opening). */
+    val brand = Brand(this)
+
     var time = 0f
         private set
 
@@ -70,7 +73,6 @@ class UiKit(context: Context) {
         return p
     }
 
-    /** Draws text that shrinks to fit [maxWidth]. */
     /** Shrinks [p]'s text size in place so [text] is at most [maxWidth] wide (for effects that draw it themselves). */
     fun fitSize(p: Paint, text: String, maxWidth: Float): Paint {
         val w = p.measureText(text)
@@ -78,6 +80,7 @@ class UiKit(context: Context) {
         return p
     }
 
+    /** Draws text that shrinks to fit [maxWidth]. */
     fun fitText(c: Canvas, text: String, x: Float, y: Float, p: Paint, maxWidth: Float) {
         val w = p.measureText(text)
         if (w <= maxWidth || w <= 0f) {

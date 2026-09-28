@@ -22,6 +22,7 @@ import com.dedonervoso.app.ui.Palette
 import com.dedonervoso.app.ui.ScreenHost
 import com.dedonervoso.app.ui.UiKit
 import com.dedonervoso.app.ui.screens.HomeScreen
+import com.dedonervoso.app.ui.screens.IntroScreen
 import com.dedonervoso.app.ui.screens.OnboardingScreen
 import java.util.Locale
 
@@ -51,11 +52,12 @@ class GameApp(val activity: MainActivity) {
     }
 
     fun start() {
-        val home = HomeScreen(this)
-        if (progression.save.onboardingDone) host.setRoot(home) else {
-            host.setRoot(home)
-            host.push(OnboardingScreen(this))
-        }
+        host.setRoot(IntroScreen(this) { enterGame() })
+    }
+
+    /** After the opening: Home, with the onboarding on top on the first run. */
+    private fun enterGame() {
+        host.resetTo(HomeScreen(this), if (progression.save.onboardingDone) null else OnboardingScreen(this))
     }
 
     private fun resolveStrings(): Strings =

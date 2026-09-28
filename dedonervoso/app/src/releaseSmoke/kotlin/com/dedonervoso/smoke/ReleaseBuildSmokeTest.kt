@@ -44,6 +44,9 @@ class ReleaseBuildSmokeTest {
         val density = view.resources.displayMetrics.density
         val w = view.width.toFloat()
         val h = view.height.toFloat()
+        shot("r0_intro")
+        // A touch skips the opening; then the first-run onboarding shows.
+        tap(w / 2f, h / 2f, 40)
         shot("r1_onboarding")
 
         // Three onboarding pages, then START (primary button at 62% of the height, 66dp tall).

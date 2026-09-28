@@ -10,6 +10,7 @@ import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.core.save.SaveData
 import com.dedonervoso.app.platform.SaveStore
 import com.dedonervoso.app.ui.Button
+import com.dedonervoso.app.ui.screens.IntroScreen
 import com.dedonervoso.app.ui.screens.PlayScreen
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
@@ -27,7 +28,7 @@ class GameHarness {
 
     val saveFile: File get() = File(RuntimeEnvironment.getApplication().filesDir, SaveStore.FILE_NAME)
 
-    fun launch(seed: SaveData? = null): GameHarness {
+    fun launch(seed: SaveData? = null, skipIntro: Boolean = true): GameHarness {
         // Deliver vsync at a real 60 Hz cadence as the virtual clock advances (the game loop
         // re-posts its frame callback every frame; immediate vsync would spin forever).
         ShadowChoreographer.setPaused(true)
@@ -35,6 +36,8 @@ class GameHarness {
         if (seed != null) saveFile.writeText(SaveCodec.encode(seed))
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         frames(40)
+        // The opening is skippable by a touch (as players do); flows start from what follows.
+        if (skipIntro && app.host.current is IntroScreen) tap(activity.view.width / 2f, activity.view.height / 2f, 40)
         return this
     }
 

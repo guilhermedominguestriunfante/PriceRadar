@@ -409,8 +409,19 @@ abstract class RobolectricConfigTask : DefaultTask() {
         val file = outputDir.get().asFile.resolve("com/android/tools/test_config.properties")
         file.parentFile.mkdirs()
         val assetsDir = assets.files.firstOrNull() ?: File(temporaryDir, "no-assets").apply { mkdirs() }
+        // A content digest (a real key: Gradle ignores comments when fingerprinting .properties)
+        // makes this test input change with resources and assets, so tests re-run.
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        md.update(manifest.get().asFile.readBytes())
+        md.update(resourcesApk.get().asFile.readBytes())
+        for (f in assets.asFileTree.files.sortedBy { it.path }) {
+            md.update(f.path.toByteArray())
+            md.update(f.readBytes())
+        }
+        val digest = md.digest().joinToString("") { "%02x".format(it) }
         file.writeText(
             """
+            dedo_inputs_sha256=$digest
             android_merged_manifest=${manifest.get().asFile.absolutePath}
             android_merged_assets=${assetsDir.absolutePath}
             android_resource_apk=${resourcesApk.get().asFile.absolutePath}

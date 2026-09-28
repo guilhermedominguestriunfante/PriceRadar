@@ -7,6 +7,7 @@ import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.core.save.SaveData
 import com.dedonervoso.app.platform.Links
 import com.dedonervoso.app.ui.screens.HomeScreen
+import com.dedonervoso.app.ui.screens.IntroScreen
 import com.dedonervoso.app.ui.screens.OnboardingScreen
 import com.dedonervoso.app.ui.screens.PlayScreen
 import com.dedonervoso.app.ui.screens.ProfileScreen
@@ -161,6 +162,16 @@ class GameFlowTest {
         val card = h.buttons().filter { it.label.isEmpty() && it.icon == null }.maxByOrNull { it.rect.top }!!
         h.click(card, 60)
         h.screenshot("37_stage_select")
+    }
+
+    @Test
+    fun openingPlaysThenOpensTheGameByItself() {
+        val h = GameHarness().launch(GameHarness.progressedSave(), skipIntro = false)
+        assertTrue("opening first", h.app.host.current is IntroScreen)
+        h.frames(10)
+        h.screenshot("00_intro_name")
+        h.frames(120)
+        assertTrue("then Home without any touch", h.app.host.current is HomeScreen)
     }
 
     @Test

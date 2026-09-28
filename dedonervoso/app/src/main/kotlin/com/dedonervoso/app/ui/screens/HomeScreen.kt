@@ -11,10 +11,9 @@ import com.dedonervoso.app.ui.NumText
 import com.dedonervoso.app.ui.Palette
 import com.dedonervoso.app.ui.Screen
 import com.dedonervoso.app.ui.Visuals
-import kotlin.math.sin
 
 /**
- * Home (spec §30): level + coins on top, animated TAP TAP logo, the selected stage, a big
+ * Home (spec §30): level + coins on top, animated DEDO NERVOSO logo, the selected stage, a big
  * JOGAR button, shortcuts, missions/daily and the developer's LinkedIn link.
  */
 class HomeScreen(app: GameApp) : Screen(app) {
@@ -171,22 +170,10 @@ class HomeScreen(app: GameApp) : Screen(app) {
         val a = appear(0f)
         val slam = Ease.outBack(a, 2.2f)
         val cx = width / 2f
-        val p = ui.style(ui.displayPaint, 1f, Palette.WHITE, Paint.Align.CENTER)
-        p.textSize = logoSize * (1.25f - 0.25f * slam)
-        val breathe = 0.5f + 0.5f * sin(ui.time * 2.2f)
-        val gap = logoSize * 0.98f
-        val y1 = logoY - gap * 0.08f
-        val y2 = y1 + gap
-        ui.neon.glowBlob(c, cx, logoY + gap * 0.3f, logoSize * 3.2f, Palette.PURPLE, 0.3f * a)
-        // Echo copies give the "TAP TAP" impact double-image.
-        p.color = Palette.withAlpha(Palette.MAGENTA, 0.55f * a)
-        c.drawText("TAP", cx + logoSize * 0.06f, y1 + logoSize * 0.05f, p)
-        p.color = Palette.withAlpha(Palette.CYAN, a)
-        ui.neon.glowText(c, "TAP", cx, y1, p, Palette.withAlpha(Palette.CYAN, (0.7f + 0.3f * breathe) * a), logoSize * 0.28f)
-        p.color = Palette.withAlpha(Palette.CYAN, 0.5f * a)
-        c.drawText("TAP", cx - logoSize * 0.06f, y2 + logoSize * 0.05f, p)
-        p.color = Palette.withAlpha(Palette.MAGENTA, a)
-        ui.neon.glowText(c, "TAP", cx, y2, p, Palette.withAlpha(Palette.MAGENTA, (0.7f + 0.3f * (1f - breathe)) * a), logoSize * 0.28f)
+        val size = logoSize * 0.95f * (1.25f - 0.25f * slam)
+        ui.neon.glowBlob(c, cx, logoY + logoSize * 0.3f, logoSize * 3.2f, Palette.PURPLE, 0.3f * a)
+        val shake = if (app.settings.reduceEffects) 0f else 1f
+        val y2 = ui.brand.wordmark(c, cx, logoY - size * 0.06f, size, width * 0.9f, a, ui.time, shake)
         val tp = ui.style(ui.textPaint, 14f, Palette.withAlpha(Palette.DIM, a), Paint.Align.CENTER)
         tp.letterSpacing = 0.25f
         c.drawText(s.tagline.uppercase(), cx, y2 + logoSize * 0.55f, tp)
