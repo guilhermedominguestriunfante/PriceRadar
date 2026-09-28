@@ -360,6 +360,32 @@ class GameSessionTest {
         weights = ZoneConfig.weights(ZoneType.X3 to 1),
     )
 
+    @Test
+    fun spawnedZonesLeaveTheComboCoreClear() {
+        val cfg = ZoneConfig(
+            spawnMinMs = 250, spawnMaxMs = 250, maxConcurrent = 1, lifeMinMs = 300, lifeMaxMs = 300,
+            weights = ZoneConfig.weights(ZoneType.X2 to 1, ZoneType.X3 to 1, ZoneType.X5 to 1, ZoneType.CRITICAL to 1),
+        )
+        var spawns = 0
+        for (seed in 1L..20L) {
+            val listener = object : GameListener {
+                override fun onZoneSpawn(zone: Zone) {
+                    spawns++
+                    val t = zone.spawnAt
+                    val d = kotlin.math.hypot(zone.x(t) - 0.5f, zone.y(t) - 0.7f)
+                    assertTrue(d >= GameBalance.CORE_CLEAR_RADIUS + zone.radius(t) - 1e-4f, "zone at distance $d covers the core (seed $seed)")
+                }
+            }
+            val s = session(plainStage(zones = cfg), listener = listener, seed = seed)
+            var t = playStart
+            while (t < playStart + 15_000L) {
+                t += 16
+                s.update(t)
+            }
+        }
+        assertTrue(spawns > 300, "enough spawns sampled: $spawns")
+    }
+
     private fun firstZone(s: GameSession, from: Long): Pair<Zone, Long> {
         var t = from
         while (true) {

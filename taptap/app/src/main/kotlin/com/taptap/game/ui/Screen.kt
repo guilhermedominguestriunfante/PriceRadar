@@ -28,6 +28,7 @@ abstract class Screen(protected val app: GameApp) {
 
     /** Exposed for UI tests. */
     internal val buttonsForTest: List<Button> get() = buttons
+    internal val scrollsForTest: List<ScrollArea> get() = scrolls
     private var pressed: Button? = null
     private var dragScroll: ScrollArea? = null
     private var downX = 0f

@@ -9,6 +9,8 @@ import com.taptap.game.platform.Links
 import com.taptap.game.ui.screens.HomeScreen
 import com.taptap.game.ui.screens.OnboardingScreen
 import com.taptap.game.ui.screens.PlayScreen
+import com.taptap.game.ui.screens.ProfileScreen
+import com.taptap.game.ui.screens.RankingScreen
 import com.taptap.game.ui.screens.ResultScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -133,6 +135,20 @@ class GameFlowTest {
         )) {
             h.click(label, 60)
             h.screenshot(name)
+            // Layout runs again after onEnter loaded the data: lists are scrollable to their end
+            // and the ranking's empty-state PLAY button is absent when there are results.
+            val screen = h.app.host.current!!
+            for (scroll in screen.scrollsForTest) {
+                assertTrue("$name content height covers its rows", scroll.contentHeight > 0f)
+            }
+            if (screen is RankingScreen) {
+                assertTrue("no empty-state button with results", h.buttons().none { it.label == s.play })
+                assertTrue("ranking rows scroll", screen.scrollsForTest.single().contentHeight > screen.scrollsForTest.single().rect.height())
+            }
+            if (screen is ProfileScreen) {
+                val scroll = screen.scrollsForTest.single()
+                assertTrue("every statistic reachable", scroll.contentHeight > scroll.rect.height())
+            }
             h.activity.onBackPressed()
             h.frames(40)
             assertTrue("back to home from $name", h.app.host.current is HomeScreen)

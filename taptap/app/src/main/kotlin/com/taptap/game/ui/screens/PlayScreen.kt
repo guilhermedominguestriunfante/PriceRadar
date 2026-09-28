@@ -914,13 +914,13 @@ class PlayScreen(
         if (sess.comboShieldsLeft > 0) {
             ui.icons.draw(c, Icon.SHIELD, x, by, 18f * u, Palette.GREEN)
             val np = ui.style(ui.textPaint, 12f, Palette.GREEN, Paint.Align.LEFT)
-            c.drawText("${sess.comboShieldsLeft}", x + 11f * u, by + 5f * u, np)
+            c.drawText(SMALL_NUMBERS[sess.comboShieldsLeft.coerceIn(0, SMALL_NUMBERS.lastIndex)], x + 11f * u, by + 5f * u, np)
             x += 34f * u
         }
         if (sess.stopShieldsLeft > 0) {
             ui.icons.draw(c, Icon.HAND, x, by, 18f * u, Palette.CYAN)
             val np = ui.style(ui.textPaint, 12f, Palette.CYAN, Paint.Align.LEFT)
-            c.drawText("${sess.stopShieldsLeft}", x + 11f * u, by + 5f * u, np)
+            c.drawText(SMALL_NUMBERS[sess.stopShieldsLeft.coerceIn(0, SMALL_NUMBERS.lastIndex)], x + 11f * u, by + 5f * u, np)
         }
         if (sess.goBoostActive) {
             val gp = ui.style(ui.displayBoldPaint, 14f, Palette.GREEN, Paint.Align.RIGHT)
@@ -1148,5 +1148,6 @@ class PlayScreen(
         private const val POPUP_POINTS = 2
         private val ZONE_LABELS = arrayOf("x2", "x3", "x5", "", "", "", "", "")
         private val COUNT_LABELS = arrayOf("", "1", "2", "3")
+        private val SMALL_NUMBERS = Array(10) { it.toString() }
     }
 }

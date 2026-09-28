@@ -34,6 +34,9 @@ class FloatingTexts(private val dp: Float, private val paints: Array<Paint>) {
         count = 0
     }
 
+    /** Texts currently shown, oldest first (UI tests). */
+    internal fun textsForTest(): List<String> = (0 until count).map { text[it]!! }
+
     /** [fontIndex] selects one of [paints]; [sizeDp] overrides its size. */
     fun add(s: String, px: Float, py: Float, col: Int, sizeDp: Float, lifeS: Float = 0.7f, riseDp: Float = 70f, fontIndex: Int = 0): Int {
         val k = if (count < cap) count++ else oldest()
