@@ -4,13 +4,16 @@ O online usa o plano gratuito do Firebase (Spark): login anônimo + Cloud Firest
 de cartão. O jogo fala com o Firebase pela API REST, então o app não depende do Google Play
 Services.
 
+Quer que o Codex faça a configuração por você? Veja
+[CODEX-FIREBASE-SETUP.md](CODEX-FIREBASE-SETUP.md).
+
 ## 1. Criar o projeto
 
 1. Em <https://console.firebase.google.com>, **Adicionar projeto** → nome `Dedo Nervoso`.
    O Google Analytics é opcional (pode desativar).
 2. **Authentication** → *Vamos começar* → aba *Método de login* → **Anônimo** → Ativar → Salvar.
    (O login com Google entra numa próxima versão; veja o item 5.)
-3. **Firestore Database** → *Criar banco de dados* → **modo de produção** →
+3. **Firestore Database** → *Criar banco de dados* → edição Standard → **modo de produção** →
    local **southamerica-east1 (São Paulo)**. O local não pode ser trocado depois.
 4. Ainda no Firestore, aba **Regras**: apague o conteúdo e cole o arquivo
    [`firebase/firestore.rules`](../firebase/firestore.rules) inteiro → **Publicar**.
@@ -42,6 +45,16 @@ Variáveis novas só valem em **sessões novas**. Com elas, cada build já sai c
 ligado ao seu projeto e assinado com a mesma chave (as atualizações instalam por cima).
 
 ## 4. Testar
+
+Para conferir o projeto sem o celular, você precisa de Node.js e do login do Firebase CLI
+(`npx --yes firebase-tools@13 login`). Com isso, rode:
+
+```bash
+bash firebase/verify-online.sh ID_DO_PROJETO
+```
+
+O script faz um login anônimo de teste e testa as regras do jeito que o jogo usa. Depois roda a
+consulta do ranking e apaga o que criou. A chave de API não aparece na saída.
 
 Instale o APK novo, abra **Ranking → Online → Ativar ranking online**. No console do
 Firebase, em Firestore, devem aparecer as coleções `players` e `codes`.

@@ -101,8 +101,9 @@ dedonervoso/
 ├── tools/      Gerador dos efeitos sonoros (roda no build, grava WAVs em assets)
 ├── testshim/   Substitutos mínimos de androidx.test para o Robolectric
 ├── buildSrc/   Plugin Gradle `dedonervoso.android-apk` que gera o APK com as ferramentas do SDK
-├── firebase/   Regras do Firestore e configuração dos emuladores
-├── docs/       FIREBASE.md (configurar o online) e RELEASING.md (publicar versões)
+├── firebase/   Regras do Firestore, emuladores e verify-online.sh
+├── docs/       FIREBASE.md (configurar o online), CODEX-FIREBASE-SETUP.md (roteiro para o Codex)
+│               e RELEASING.md (publicar versões)
 └── release/    APK publicado + version.json (lido pelo jogo para avisar de atualizações)
 ```
 
