@@ -71,6 +71,11 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         y += 86f * u
         aboutTop = y
         y += 150f * u
+        val check = button(s.checkUpdates, Icon.DOWNLOAD, Button.Style.SECONDARY, if (app.updates.hasUpdate) Palette.GREEN else Palette.CYAN) { checkUpdates() }
+        check.scroll = scroll
+        check.rect.set(scroll.rect.left + 4f * u, y, scroll.rect.right - 4f * u, y + 46f * u)
+        if (app.updates.hasUpdate) check.badge = "!"
+        y += 62f * u
         val link = button(s.developer, Icon.LINKEDIN, Button.Style.LINK, Palette.BLUE) { app.openDeveloperLink() }
         link.sublabel = "linkedin.com/in/guilhermekawe"
         link.scroll = scroll
@@ -122,7 +127,7 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         c.drawText(s.about, scroll.rect.left + 12f * u, aboutTop, hp)
         val tp = ui.style(ui.semiPaint, 14f, Palette.TEXT, Paint.Align.LEFT)
         var y = aboutTop + 28f * u
-        c.drawText("DEDO NERVOSO · ${s.version} $VERSION", scroll.rect.left + 12f * u, y, tp)
+        c.drawText("DEDO NERVOSO · ${s.version} ${app.updates.version.name}", scroll.rect.left + 12f * u, y, tp)
         y += 24f * u
         val mp = ui.style(ui.mediumPaint, 13f, Palette.DIM, Paint.Align.LEFT)
         y += ui.wrapText(c, s.privacyNote, scroll.rect.left + 12f * u, y, mp, scroll.rect.width() - 24f * u, 18f * u)
@@ -131,7 +136,15 @@ class SettingsScreen(app: GameApp) : Screen(app) {
         drawButtons(c)
     }
 
-    companion object {
-        const val VERSION = "1.0.0"
+    override fun onUpdatesChanged() = relayout()
+
+    private fun checkUpdates() {
+        app.updates.check(force = true) { ok ->
+            when {
+                app.updates.hasUpdate -> app.showUpdate()
+                ok -> app.host.toast(s.upToDate, "${s.version} ${app.updates.version.name}", Icon.CHECK, Palette.GREEN)
+                else -> app.host.toast(s.updateCheckFailed, "${s.version} ${app.updates.version.name}", Icon.INFO, Palette.ORANGE)
+            }
+        }
     }
 }

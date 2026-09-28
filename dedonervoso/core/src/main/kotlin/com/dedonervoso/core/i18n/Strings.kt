@@ -163,6 +163,18 @@ abstract class Strings {
     abstract val resetDone: String
     abstract val about: String
     abstract val version: String
+
+    // Updates (the game is distributed as an APK and announces new versions itself).
+    abstract fun updateAvailable(version: String): String
+    abstract fun updateTitle(version: String): String
+    abstract val updateRequiredOnline: String
+    abstract val updateDefaultNotes: String
+    abstract val download: String
+    abstract val later: String
+    abstract val checkUpdates: String
+    abstract val upToDate: String
+    abstract val updateCheckFailed: String
+    abstract val linkFailed: String
     abstract val credits: String
     abstract val fontsCredit: String
     abstract val privacyNote: String

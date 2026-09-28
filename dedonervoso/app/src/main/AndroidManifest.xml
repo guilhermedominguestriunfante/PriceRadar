@@ -2,8 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.dedonervoso.app">
 
-    <!-- Haptic feedback. No other permissions: no internet, no personal data (spec §61). -->
+    <!-- Haptic feedback. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Internet: new-version notices and, when the player turns it on, online ranking and duels.
+         Nothing else is requested: no location, contacts, phone or accounts (spec §61). -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"

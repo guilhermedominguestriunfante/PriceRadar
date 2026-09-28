@@ -73,6 +73,8 @@ abstract class Screen(protected val app: GameApp) {
         relayout()
     }
     open fun onExit() {}
+    /** Update information changed (a check finished); screens that show it re-layout. */
+    open fun onUpdatesChanged() {}
     open fun onAppPause() {}
     open fun onAppResume() {}
 
@@ -372,6 +374,9 @@ class ScreenHost(private val app: GameApp) {
     fun onAppResume() = current?.onAppResume()
 
     // ---- dialogs -----------------------------------------------------------------------------
+
+    /** Exposed for UI tests. */
+    internal val dialogButtonsForTest: List<Button> get() = dialogButtons
 
     fun showDialog(d: Dialog) {
         dialog = d

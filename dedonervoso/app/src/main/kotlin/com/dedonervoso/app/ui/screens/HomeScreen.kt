@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import com.dedonervoso.app.GameApp
+import com.dedonervoso.core.online.UpdateState
 import com.dedonervoso.core.util.Ease
 import com.dedonervoso.app.ui.Button
 import com.dedonervoso.app.ui.Icon
@@ -21,6 +22,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
     private val coinRect = RectF()
     private val cardRect = RectF()
     private var logoY = 0f
+    private var updatePill: Button? = null
     private var logoSize = 0f
     private var shownCoins = -1f
     private val coinText = NumText { app.strings.num(it) }
@@ -38,6 +40,8 @@ class HomeScreen(app: GameApp) : Screen(app) {
         app.keepScreenOn(false)
         app.progression.ensureMissions()
     }
+
+    override fun onUpdatesChanged() = relayout()
 
     override fun layout() {
         val w = width
@@ -108,9 +112,24 @@ class HomeScreen(app: GameApp) : Screen(app) {
             prevStage.rect.right + 4f * u, cardRect.top, nextStage.rect.left - 4f * u, cardRect.bottom,
         )
 
+        // A new version is announced right above the stage card; the logo gives up the room.
+        var logoBottom = cardRect.top - 10f * u
+        updatePill = null
+        val release = app.updates.release
+        if (app.updates.hasUpdate && release != null) {
+            val required = app.updates.state == UpdateState.REQUIRED_FOR_ONLINE
+            val pillH = 38f * u
+            val pillW = minOf(w - 60f * u, 290f * u)
+            updatePill = button(s.updateAvailable(release.versionName), Icon.DOWNLOAD, Button.Style.SECONDARY, if (required) Palette.ORANGE else Palette.GREEN) {
+                app.showUpdate()
+            }.apply {
+                rect.set(w / 2f - pillW / 2f, logoBottom - pillH, w / 2f + pillW / 2f, logoBottom)
+                pulse = true
+            }
+            logoBottom -= pillH + 6f * u
+        }
         // Logo takes the remaining space between the top bar and the card.
         val logoTop = top + 56f * u
-        val logoBottom = cardRect.top - 10f * u
         logoSize = minOf((logoBottom - logoTop) * 0.36f, w * 0.2f, 84f * u)
         logoY = (logoTop + logoBottom) / 2f
         refreshBadges()
@@ -174,6 +193,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
         ui.neon.glowBlob(c, cx, logoY + logoSize * 0.3f, logoSize * 3.2f, Palette.PURPLE, 0.3f * a)
         val shake = if (app.settings.reduceEffects) 0f else 1f
         val y2 = ui.brand.wordmark(c, cx, logoY - size * 0.06f, size, width * 0.9f, a, ui.time, shake)
+        if (updatePill != null) return
         val tp = ui.style(ui.textPaint, 14f, Palette.withAlpha(Palette.DIM, a), Paint.Align.CENTER)
         tp.letterSpacing = 0.25f
         c.drawText(s.tagline.uppercase(), cx, y2 + logoSize * 0.55f, tp)

@@ -52,6 +52,7 @@ object SaveCodec {
             ),
             "onboardingDone" to d.onboardingDone,
             "seenIntros" to d.seenIntros.map { it.name }.sorted(),
+            "release" to mapOf("manifest" to d.releaseCache, "url" to d.releaseManifestUrl, "checkedAt" to d.releaseCheckedAt),
         ),
     )
 
@@ -129,6 +130,10 @@ object SaveCodec {
         d.settings.showFps = s.bool("showFps", false)
         d.settings.language = s.string("language", "auto").takeIf { it in LANGUAGES } ?: "auto"
         d.onboardingDone = o.bool("onboardingDone")
+        val release = o.obj("release")
+        d.releaseCache = release.string("manifest").take(MAX_RELEASE_JSON)
+        d.releaseManifestUrl = release.string("url").takeIf { it.startsWith("https://") } ?: ""
+        d.releaseCheckedAt = release.long("checkedAt").coerceAtLeast(0L)
         for (name in o.list("seenIntros")) {
             Mechanic.values().firstOrNull { it.name == name }?.let { d.seenIntros += it }
         }
@@ -170,5 +175,6 @@ object SaveCodec {
     private const val MAX_XP = 9_999_999_999L
     private const val MAX_SCORE = 99_999_999L
     private const val MAX_STAGE = 9_999
+    private const val MAX_RELEASE_JSON = 16_384
     private val LANGUAGES = setOf("auto", "pt", "en")
 }

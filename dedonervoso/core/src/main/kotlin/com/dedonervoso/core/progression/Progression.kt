@@ -355,6 +355,14 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
 
     fun settingsChanged() = changed()
 
+    /** Remembers the last release manifest seen (see [SaveData.releaseCache]). */
+    fun recordRelease(manifestJson: String, manifestUrl: String, checkedAt: Long) {
+        save.releaseCache = manifestJson
+        save.releaseManifestUrl = manifestUrl
+        save.releaseCheckedAt = checkedAt
+        changed()
+    }
+
     /** Wipes progress but keeps settings and identity (spec §51, confirmed by the UI). */
     fun resetProgress() {
         val fresh = SaveData(profile = save.profile, settings = save.settings)

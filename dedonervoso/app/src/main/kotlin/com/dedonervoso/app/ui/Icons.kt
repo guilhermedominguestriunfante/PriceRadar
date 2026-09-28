@@ -10,7 +10,7 @@ import kotlin.math.sin
 enum class Icon {
     COIN, STAR, STAR_OUTLINE, GEAR, TROPHY, USER, BOLT, HEART, HEART_EMPTY, SHIELD, PAUSE, PLAY, HOME,
     RETRY, NEXT, BACK, CLOSE, LOCK, CHECK, LINKEDIN, TARGET, FLAME, CLOCK, CROWN, SKULL, MUSIC, SOUND,
-    VIBRATION, SPARKLE, GLOBE, TRASH, INFO, PODIUM, MEDAL, LIST, CALENDAR, UP, GRID, COMBO, HAND,
+    VIBRATION, SPARKLE, GLOBE, TRASH, INFO, PODIUM, MEDAL, LIST, CALENDAR, UP, GRID, COMBO, HAND, DOWNLOAD,
 }
 
 /**
@@ -289,6 +289,13 @@ class Icons {
                 moveTo(0f, -0.46f); lineTo(0.4f, 0f); lineTo(0.16f, 0f); lineTo(0.16f, 0.44f)
                 lineTo(-0.16f, 0.44f); lineTo(-0.16f, 0f); lineTo(-0.4f, 0f); close()
             }, fill)
+            Icon.DOWNLOAD -> {
+                c.drawPath(path(icon) {
+                    moveTo(0f, 0.2f); lineTo(0.3f, -0.08f); lineTo(0.12f, -0.08f); lineTo(0.12f, -0.46f)
+                    lineTo(-0.12f, -0.46f); lineTo(-0.12f, -0.08f); lineTo(-0.3f, -0.08f); close()
+                }, fill)
+                c.drawRoundRect(-0.42f, 0.3f, 0.42f, 0.44f, 0.06f, 0.06f, fill)
+            }
             Icon.GRID -> {
                 for (i in 0..1) for (j in 0..1) {
                     val x = -0.4f + i * 0.46f

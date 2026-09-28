@@ -50,6 +50,11 @@ class SaveData(
     val settings: Settings = Settings(),
     var onboardingDone: Boolean = false,
     val seenIntros: MutableSet<Mechanic> = HashSet(),
+    /** Last release manifest seen (JSON), so update notices and the online gate work offline. */
+    var releaseCache: String = "",
+    /** Where that manifest was found (it may have moved from the built-in address). */
+    var releaseManifestUrl: String = "",
+    var releaseCheckedAt: Long = 0L,
 ) {
     val totalStars: Int get() = stageStars.values.sum()
     val highestCleared: Int get() = highestUnlocked - 1

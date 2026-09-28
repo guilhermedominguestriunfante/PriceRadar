@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import com.dedonervoso.core.engine.GameState
 import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.core.save.SaveData
+import com.dedonervoso.app.platform.Endpoints
 import com.dedonervoso.app.platform.SaveStore
 import com.dedonervoso.app.ui.Button
 import com.dedonervoso.app.ui.screens.IntroScreen
@@ -22,6 +23,9 @@ import java.time.Duration
 
 /** Drives the real activity under Robolectric: frames, touches, screenshots, match bot. */
 class GameHarness {
+    /** Stands in for the internet; tests add routes before [launch]. */
+    val server = FakeServer()
+
     lateinit var controller: ActivityController<MainActivity>
     val activity: MainActivity get() = controller.get()
     val app: GameApp get() = activity.app
@@ -34,11 +38,22 @@ class GameHarness {
         ShadowChoreographer.setPaused(true)
         ShadowChoreographer.setFrameDelay(Duration.ofMillis(16))
         if (seed != null) saveFile.writeText(SaveCodec.encode(seed))
+        Endpoints.releaseManifest = server.url("/release/version.json")
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         frames(40)
         // The opening is skippable by a touch (as players do); flows start from what follows.
         if (skipIntro && app.host.current is IntroScreen) tap(activity.view.width / 2f, activity.view.height / 2f, 40)
         return this
+    }
+
+    /** Runs frames until [condition] holds, giving background (network) threads real time to answer. */
+    fun awaitCondition(what: String, timeoutMs: Long = 5_000, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition()) {
+            if (System.currentTimeMillis() > deadline) error("Timed out waiting for $what")
+            Thread.sleep(10)
+            frames(1)
+        }
     }
 
     /** Advances the virtual clock one ~60 Hz frame at a time. */
@@ -71,6 +86,13 @@ class GameHarness {
     }
 
     fun click(label: String, settle: Int = 40) = click(button(label), settle)
+
+    /** Taps a button of the open dialog. */
+    fun clickDialog(label: String, settle: Int = 20) {
+        val b = app.host.dialogButtonsForTest.firstOrNull { it.label == label }
+            ?: error("No dialog button '$label': ${app.host.dialogButtonsForTest.map { it.label }}")
+        tap(b.rect.centerX(), b.rect.centerY(), settle)
+    }
 
     fun screenshot(name: String) {
         val v = activity.view
