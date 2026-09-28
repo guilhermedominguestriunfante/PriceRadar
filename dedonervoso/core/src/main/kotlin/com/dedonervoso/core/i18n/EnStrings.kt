@@ -1,5 +1,7 @@
 package com.dedonervoso.core.i18n
 
+import com.dedonervoso.core.engine.DuelItem
+import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.ReflexGrade
 import com.dedonervoso.core.progression.DailyTemplate
 import com.dedonervoso.core.progression.MissionKind
@@ -321,4 +323,56 @@ object EnStrings : Strings() {
     override val privacyNote = "No ads. No account. No data collected — your progress is saved on this device."
     override val on = "ON"
     override val off = "OFF"
+    override val duel = "DUEL"
+    override fun duelIntro(seconds: Int) = "Challenge a friend live: most points in $seconds seconds wins. When an orb falls, keep up the pace it asks for to capture it, then throw the item at your rival."
+    override fun itemName(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "SLOW"
+        DuelItem.CLOCK -> "CLOCK"
+        DuelItem.STOP -> "STOP"
+    }
+    override fun itemEffect(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "Your rival's taps are worth half for ${GameBalance.DUEL_SLOW_MS / 1000} s"
+        DuelItem.CLOCK -> "Your rival loses ${GameBalance.DUEL_CLOCK_PENALTY_MS / 1000} s of clock"
+        DuelItem.STOP -> "A surprise STOP on your rival's screen"
+    }
+    override val duelItems = "ITEMS"
+    override val duelInvites = "CHALLENGES FOR YOU"
+    override val challenge = "CHALLENGE"
+    override val accept = "ACCEPT"
+    override val decline = "DECLINE"
+    override fun challengedYou(nick: String) = "$nick challenged you!"
+    override val challengeText = "Live duel: most points wins."
+    override fun waitingFor(nick: String) = "Waiting for $nick…"
+    override val waitingHint = "Your friend sees the challenge while the game is open."
+    override val callOnWhatsApp = "CALL ON WHATSAPP"
+    override val joiningDuel = "Joining the duel…"
+    override val getReady = "GET READY!"
+    override fun declined(nick: String) = "$nick declined the challenge"
+    override fun noAnswer(nick: String) = "$nick didn't answer"
+    override val challengeGone = "That challenge is no longer open"
+    override val duelFailed = "Couldn't start the duel. Check your connection."
+    override val duelsUnavailable = "Duels aren't available in this version."
+    override val giveUpTitle = "Give up?"
+    override val giveUpText = "Leaving now counts as a loss."
+    override val giveUp = "GIVE UP"
+    override val keepPlaying = "KEEP PLAYING"
+    override val victory = "VICTORY!"
+    override val defeat = "DEFEAT"
+    override val draw = "DRAW"
+    override val walkover = "Walkover: your rival didn't finish"
+    override val rivalGaveUp = "Your rival gave up"
+    override val youGaveUp = "You gave up"
+    override fun waitingScore(nick: String) = "Waiting for $nick's score…"
+    override val rematch = "REMATCH"
+    override fun itemsSummary(thrown: Int, received: Int) = "Items: $thrown thrown · $received received"
+    override val rivalOffline = "OFFLINE"
+    override fun itemReady(item: DuelItem) = "${itemName(item)} READY!"
+    override fun itemThrown(item: DuelItem) = "${itemName(item)} SENT!"
+    override fun itemHit(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "SLOW: POINTS ÷2"
+        DuelItem.CLOCK -> "CLOCK: -${GameBalance.DUEL_CLOCK_PENALTY_MS / 1000} s"
+        DuelItem.STOP -> "RIVAL'S STOP!"
+    }
+    override val throwItem = "THROW"
+    override val noItem = "NO ITEM"
 }

@@ -71,23 +71,29 @@ val generateSfx = tasks.register<JavaExec>("generateSfx") {
 androidApk.extraAssetDirs.from(generateSfx.map { layout.buildDirectory.dir("generated/assets").get() })
 
 // Online (Firebase) settings ship as assets/config/online.properties: the project ID
-// (dedo.firebaseProjectId in gradle.properties, or DEDO_FIREBASE_PROJECT_ID) and the project's public
+// (dedo.firebaseProjectId in gradle.properties, or DEDO_FIREBASE_PROJECT_ID), the Realtime Database
+// of live duels (dedo.firebaseDatabaseUrl, or DEDO_FIREBASE_DATABASE_URL) and the project's public
 // Web API key, which only comes from the environment (DEDO_FIREBASE_API_KEY) and is never committed.
 // Without the key the build still works and online features say they're unavailable.
 val onlineProjectId = providers.environmentVariable("DEDO_FIREBASE_PROJECT_ID")
     .orElse(providers.gradleProperty("dedo.firebaseProjectId")).orElse("")
+val onlineDatabaseUrl = providers.environmentVariable("DEDO_FIREBASE_DATABASE_URL")
+    .orElse(providers.gradleProperty("dedo.firebaseDatabaseUrl")).orElse("")
 val onlineApiKey = providers.environmentVariable("DEDO_FIREBASE_API_KEY").orElse("")
 val generateOnlineConfig = tasks.register("generateOnlineConfig") {
     group = "build"
     description = "Writes the Firebase project settings used by online play."
     val outDir = layout.buildDirectory.dir("generated/online-assets")
     inputs.property("projectId", onlineProjectId)
+    inputs.property("databaseUrl", onlineDatabaseUrl)
     inputs.property("apiKeyDigest", onlineApiKey.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } })
     outputs.dir(outDir)
     doLast {
         val file = outDir.get().file("config/online.properties").asFile
         file.parentFile.mkdirs()
-        file.writeText("projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\n")
+        file.writeText(
+            "projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\ndatabaseUrl=${onlineDatabaseUrl.get().trim()}\n",
+        )
         if (onlineProjectId.get().isBlank() || onlineApiKey.get().isBlank()) {
             logger.lifecycle("Online disabled in this build (DEDO_FIREBASE_API_KEY not set).")
         }

@@ -1,5 +1,6 @@
 package com.dedonervoso.core.i18n
 
+import com.dedonervoso.core.engine.DuelItem
 import com.dedonervoso.core.engine.ReflexGrade
 import com.dedonervoso.core.progression.DailyTemplate
 import com.dedonervoso.core.progression.MissionKind
@@ -214,6 +215,50 @@ abstract class Strings {
     abstract val privacyNote: String
     abstract val on: String
     abstract val off: String
+
+    // Live duels (on top of online play).
+    abstract val duel: String
+    abstract fun duelIntro(seconds: Int): String
+    abstract fun itemName(item: DuelItem): String
+    abstract fun itemEffect(item: DuelItem): String
+    /** "9/s · 3s": the tap rate to keep up, and for how long, to capture the item. */
+    fun itemPace(item: DuelItem): String = "${item.requiredTps.toInt()}/s · ${item.holdMs / 1000}s"
+    abstract val duelItems: String
+    abstract val duelInvites: String
+    abstract val challenge: String
+    abstract val accept: String
+    abstract val decline: String
+    abstract fun challengedYou(nick: String): String
+    abstract val challengeText: String
+    abstract fun waitingFor(nick: String): String
+    abstract val waitingHint: String
+    abstract val callOnWhatsApp: String
+    abstract val joiningDuel: String
+    abstract val getReady: String
+    abstract fun declined(nick: String): String
+    abstract fun noAnswer(nick: String): String
+    abstract val challengeGone: String
+    abstract val duelFailed: String
+    abstract val duelsUnavailable: String
+    abstract val giveUpTitle: String
+    abstract val giveUpText: String
+    abstract val giveUp: String
+    abstract val keepPlaying: String
+    abstract val victory: String
+    abstract val defeat: String
+    abstract val draw: String
+    abstract val walkover: String
+    abstract val rivalGaveUp: String
+    abstract val youGaveUp: String
+    abstract fun waitingScore(nick: String): String
+    abstract val rematch: String
+    abstract fun itemsSummary(thrown: Int, received: Int): String
+    abstract val rivalOffline: String
+    abstract fun itemReady(item: DuelItem): String
+    abstract fun itemThrown(item: DuelItem): String
+    abstract fun itemHit(item: DuelItem): String
+    abstract val throwItem: String
+    abstract val noItem: String
 
     // ---- formatting ---------------------------------------------------------------------------------
 

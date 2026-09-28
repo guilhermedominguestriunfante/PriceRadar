@@ -10,6 +10,7 @@ import android.view.WindowManager
 import android.widget.EditText
 import com.dedonervoso.core.audio.Sfx
 import com.dedonervoso.core.i18n.Strings
+import com.dedonervoso.core.online.DuelInvite
 import com.dedonervoso.core.online.JavaNetHttp
 import com.dedonervoso.core.online.OnlineFailure
 import com.dedonervoso.core.online.UpdateState
@@ -17,6 +18,7 @@ import com.dedonervoso.core.progression.AchievementDef
 import com.dedonervoso.core.progression.Progression
 import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.app.platform.AppVersion
+import com.dedonervoso.app.platform.Duel
 import com.dedonervoso.app.platform.Haptics
 import com.dedonervoso.app.platform.Endpoints
 import com.dedonervoso.app.platform.Links
@@ -31,9 +33,12 @@ import com.dedonervoso.app.ui.Icon
 import com.dedonervoso.app.ui.Palette
 import com.dedonervoso.app.ui.ScreenHost
 import com.dedonervoso.app.ui.UiKit
+import com.dedonervoso.app.ui.screens.DuelResultScreen
+import com.dedonervoso.app.ui.screens.DuelWaitScreen
 import com.dedonervoso.app.ui.screens.HomeScreen
 import com.dedonervoso.app.ui.screens.IntroScreen
 import com.dedonervoso.app.ui.screens.OnboardingScreen
+import com.dedonervoso.app.ui.screens.PlayScreen
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -56,17 +61,29 @@ class GameApp(val activity: MainActivity) {
     val net: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "dedo-net").apply { isDaemon = true } }
     val updates = Updates(progression, AppVersion.of(activity), activity.packageName, JavaNetHttp(), net)
     val online = Online(progression, updates, Online.loadConfig(activity), JavaNetHttp(), net, updates.version.code)
+    val duel = Duel(online, JavaNetHttp(), net)
 
     var strings: Strings = resolveStrings()
         private set
     private var resumed = false
+
+    /** Challenges already offered in a dialog (each is offered once). */
+    private val offeredInvites = HashSet<String>()
+    private var inviteCheck = false
 
     val settings get() = progression.save.settings
 
     init {
         progression.onChanged = { store.scheduleSave(progression.save) }
         updates.onChange = { host.current?.onBackgroundUpdate() }
-        online.onChange = { host.current?.onBackgroundUpdate() }
+        online.onChange = {
+            host.current?.onBackgroundUpdate()
+            duel.syncInvites()
+        }
+        duel.onChange = {
+            host.current?.onBackgroundUpdate()
+            inviteCheck = true
+        }
         applySettings()
     }
 
@@ -107,11 +124,13 @@ class GameApp(val activity: MainActivity) {
         if (settings.music) music.start()
         host.onAppResume()
         updates.check()
+        duel.setForeground(true)
     }
 
     fun onPause() {
         resumed = false
         host.onAppPause()
+        duel.setForeground(false)
         music.stop()
         sfx.autoPause()
         store.flush(progression.save, wait = false)
@@ -122,6 +141,7 @@ class GameApp(val activity: MainActivity) {
     }
 
     fun release() {
+        duel.release()
         net.shutdownNow()
         music.stop()
         sfx.release()
@@ -217,6 +237,43 @@ class GameApp(val activity: MainActivity) {
         } catch (e: ActivityNotFoundException) {
             host.toast(strings.invite, strings.linkFailed, Icon.INFO, Palette.ORANGE)
         }
+    }
+
+    /** A screen was shown: a challenge that waited (e.g. during a match) may be offered now. */
+    fun screenShown() {
+        inviteCheck = true
+    }
+
+    /** Called by the host on frames without a transition or dialog. */
+    fun idleFrame() {
+        if (!inviteCheck) return
+        inviteCheck = false
+        offerInvite()
+    }
+
+    /** "X te desafiou!" for the newest challenge — never during a match, a duel or another dialog. */
+    private fun offerInvite() {
+        val screen = host.current ?: return
+        if (screen is PlayScreen || screen is IntroScreen || screen is OnboardingScreen || duel.busy) return
+        val invite = duel.invites.firstOrNull { it.duelId !in offeredInvites } ?: return
+        offeredInvites += invite.duelId
+        sfx.play(Sfx.ZONE_SPAWN)
+        haptics.click()
+        host.showDialog(
+            Dialog(
+                strings.challengedYou(invite.nick), strings.challengeText,
+                listOf(strings.decline to { duel.decline(invite) }, strings.accept to { acceptInvite(invite) }),
+            ),
+        )
+    }
+
+    fun acceptInvite(invite: DuelInvite) {
+        offeredInvites += invite.duelId
+        // A dialog left open while another duel got under way (both asked for a rematch): that one wins.
+        if (duel.busy) return
+        val wait = DuelWaitScreen(this, duel.accept(invite))
+        // From another duel's wait or result, the new one takes its place.
+        if (host.current is DuelWaitScreen || host.current is DuelResultScreen) host.replace(wait) else host.push(wait)
     }
 
     fun confirmDeleteOnline() {

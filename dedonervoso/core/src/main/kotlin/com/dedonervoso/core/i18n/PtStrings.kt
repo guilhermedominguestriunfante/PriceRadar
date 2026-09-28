@@ -1,5 +1,7 @@
 package com.dedonervoso.core.i18n
 
+import com.dedonervoso.core.engine.DuelItem
+import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.ReflexGrade
 import com.dedonervoso.core.progression.DailyTemplate
 import com.dedonervoso.core.progression.MissionKind
@@ -321,4 +323,56 @@ object PtStrings : Strings() {
     override val privacyNote = "Sem anúncios. Sem conta. Nenhum dado coletado — seu progresso fica salvo no aparelho."
     override val on = "ON"
     override val off = "OFF"
+    override val duel = "DUELO"
+    override fun duelIntro(seconds: Int) = "Desafie um amigo ao vivo: quem fizer mais pontos em $seconds segundos vence. Quando uma bola cair, mantenha o ritmo pedido até capturá-la e jogue o item no rival."
+    override fun itemName(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "LENTO"
+        DuelItem.CLOCK -> "RELÓGIO"
+        DuelItem.STOP -> "STOP"
+    }
+    override fun itemEffect(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "Os toques do rival valem metade por ${GameBalance.DUEL_SLOW_MS / 1000} s"
+        DuelItem.CLOCK -> "O rival perde ${GameBalance.DUEL_CLOCK_PENALTY_MS / 1000} s do relógio"
+        DuelItem.STOP -> "Um STOP surpresa na tela do rival"
+    }
+    override val duelItems = "ITENS"
+    override val duelInvites = "DESAFIOS PARA VOCÊ"
+    override val challenge = "DESAFIAR"
+    override val accept = "ACEITAR"
+    override val decline = "RECUSAR"
+    override fun challengedYou(nick: String) = "$nick te desafiou!"
+    override val challengeText = "Duelo ao vivo: quem fizer mais pontos vence."
+    override fun waitingFor(nick: String) = "Aguardando $nick…"
+    override val waitingHint = "O desafio aparece para seu amigo enquanto ele estiver com o jogo aberto."
+    override val callOnWhatsApp = "CHAMAR NO WHATSAPP"
+    override val joiningDuel = "Entrando no duelo…"
+    override val getReady = "PREPARE-SE!"
+    override fun declined(nick: String) = "$nick recusou o desafio"
+    override fun noAnswer(nick: String) = "$nick não respondeu"
+    override val challengeGone = "Esse desafio não vale mais"
+    override val duelFailed = "Não deu para começar o duelo. Confira a conexão."
+    override val duelsUnavailable = "Os duelos não estão disponíveis nesta versão."
+    override val giveUpTitle = "Desistir?"
+    override val giveUpText = "Se sair agora, o duelo conta como derrota."
+    override val giveUp = "DESISTIR"
+    override val keepPlaying = "CONTINUAR"
+    override val victory = "VITÓRIA!"
+    override val defeat = "DERROTA"
+    override val draw = "EMPATE"
+    override val walkover = "W.O.: o rival não terminou"
+    override val rivalGaveUp = "O rival desistiu"
+    override val youGaveUp = "Você desistiu"
+    override fun waitingScore(nick: String) = "Aguardando o placar de $nick…"
+    override val rematch = "REVANCHE"
+    override fun itemsSummary(thrown: Int, received: Int) = "Itens: $thrown jogados · $received recebidos"
+    override val rivalOffline = "SEM SINAL"
+    override fun itemReady(item: DuelItem) = "${itemName(item)} NA MÃO!"
+    override fun itemThrown(item: DuelItem) = "${itemName(item)} NO RIVAL!"
+    override fun itemHit(item: DuelItem) = when (item) {
+        DuelItem.SLOW -> "LENTO: PONTOS ÷2"
+        DuelItem.CLOCK -> "RELÓGIO: -${GameBalance.DUEL_CLOCK_PENALTY_MS / 1000} s"
+        DuelItem.STOP -> "STOP DO RIVAL!"
+    }
+    override val throwItem = "JOGAR"
+    override val noItem = "SEM ITEM"
 }

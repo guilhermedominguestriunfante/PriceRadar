@@ -153,7 +153,8 @@ class Online(
         }
     }
 
-    private fun profile(): OnlineProfile {
+    /** How this player appears online (also to duel rivals). */
+    fun profile(): OnlineProfile {
         val save = progression.save
         val nick = save.profile.nickname.trim().take(16).let { if (it.length < 2) it.padEnd(2, '_') else it }
         return OnlineProfile(nick, save.profile.avatar, progression.level)
@@ -182,7 +183,10 @@ class Online(
             } catch (e: java.io.IOException) {
                 // No online configuration in this build.
             }
-            return FirebaseConfig(p.getProperty("projectId", "").trim(), p.getProperty("apiKey", "").trim())
+            return FirebaseConfig(
+                p.getProperty("projectId", "").trim(), p.getProperty("apiKey", "").trim(),
+                databaseUrl = p.getProperty("databaseUrl", "").trim(),
+            )
         }
     }
 }

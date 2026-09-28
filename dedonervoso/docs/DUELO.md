@@ -1,51 +1,63 @@
-# Duelo ao vivo: onde parou
+# Duelo ao vivo
 
-Branch: `claude/tap-tap-master-spec-1s18av` (a partir do `main` depois do merge da versão 1.1.1).
+Dois amigos jogam a mesma arena ao mesmo tempo, por 60 segundos, e vence quem fizer mais pontos.
+Enquanto uma bola cai, quem mantém o ritmo pedido captura o item dela e pode jogá-lo no rival.
 
-## Pronto e testado
+| Item    | Para capturar       | Efeito no rival                 |
+|---------|---------------------|---------------------------------|
+| LENTO   | 9 toques/s por 3 s  | os toques valem metade por 5 s  |
+| RELÓGIO | 11 toques/s por 4 s | perde 3 s do relógio            |
+| STOP    | 13 toques/s por 5 s | um STOP surpresa                |
 
-- **Servidor (Realtime Database):**
-  - `core/online/RealtimeDb.kt`: REST + streaming (SSE), sem SDK.
-  - `core/online/DuelService.kt`: desafio, aceitar ou recusar, cancelar, sincronia de relógio,
-    início simultâneo, placar ao vivo e itens.
-  - `firebase/database.rules.json`: só os dois jogadores leem a sala, e cada um grava só a
-    própria parte.
-  - Testes: `DuelEmulatorTest`, contra o emulador (porta 9000, já no `firebase.json`).
-- **Motor:**
-  - `core/engine/Duel.kt` e `GameSession(duel = true)`: bolas que caem nos mesmos momentos para
-    os dois.
-  - A bola é capturada mantendo o ritmo pedido: SLOW 9 toques/s por 3 s, CLOCK 11/s por 4 s,
-    STOP 13/s por 5 s.
-  - Efeitos no rival: SLOW corta os pontos pela metade por 5 s, CLOCK tira 3 s do relógio e STOP
-    força um STOP.
-  - A arena é `StageCatalog.duel()`, sem upgrades.
-  - Testes: `DuelSessionTest`.
+O duelo aparece com o online conectado e com o Realtime Database no build
+(`dedo.firebaseDatabaseUrl` em `gradle.properties`, levado ao `online.properties`).
 
-## Falta (app)
+## Como funciona
 
-1. `app/platform/Duel.kt`: gerencia convites (stream `invites/<uid>`) e a partida (sessão
-   Firebase vinda da conta online, relógio, placar a cada ~400 ms, itens recebidos, rival
-   desconectado).
-2. Telas:
-   - Lobby: amigos com DESAFIAR e convites recebidos.
-   - Espera: aguardando o amigo, chamar no WhatsApp, cancelar.
-   - Resultado: vitória, derrota ou empate, com revanche.
-   - Botão DUELO na Home.
-   - Diálogo global de convite.
-3. `PlayScreen` em modo duelo:
-   - `Loadout.NONE` e a semente da sala;
-   - início no `startAt` do servidor;
-   - sem pausa;
-   - HUD: placar do rival, a bola caindo com o anel de captura e o ritmo pedido, e o botão do
-     item;
-   - efeitos recebidos.
-4. Textos PT/EN, testes com Robolectric (o rival simulado pelo `DuelService`) e a versão 1.2.0.
+- **Servidor:** `core/online/RealtimeDb.kt` (REST e streaming) e `core/online/DuelService.kt`
+  (sala, convite, aceite, relógio, placar e itens). As regras ficam em
+  `firebase/database.rules.json`: só os dois jogadores leem a sala, e cada um grava só a própria
+  parte.
+- **Motor:** `GameSession(duel = true)` com `StageCatalog.duel()` e `Loadout.NONE`. As bolas saem
+  da semente da sala, então caem nos mesmos momentos para os dois.
+- **App:** `app/platform/Duel.kt` roda na thread da interface, com a rede no executor `net`.
+  - **Convites:** segue `invites/<uid>` enquanto o app está na frente e online, e ignora
+    convites com mais de 10 minutos. O diálogo "X te desafiou!" nunca aparece no meio de uma
+    partida.
+  - **Anfitrião:** desafia, espera o aceite por até 60 s (depois cancela), entra na sala e
+    marca o início para 4 s depois, pelo relógio do servidor.
+  - **Convidado:** aceita, entra na sala e espera o horário de início.
+  - **Horário local:** `início − offset`, convertido para `SystemClock.uptimeMillis`. O 3-2-1
+    termina exatamente no início.
+  - **Durante a partida:**
+    - o placar é publicado a cada ~400 ms, e cada item do rival é aplicado uma única vez;
+    - o rival aparece como SEM SINAL depois de 8 s sem relatório;
+    - a partida continua com o app em segundo plano: um `Handler` mantém o relógio e os
+      relatórios.
+  - **Fim:** o relatório final (`done`) é repetido até chegar. Cada um espera o placar final do
+    rival por até 15 s; se não chegar, é W.O. O anfitrião apaga a sala depois de publicar o
+    próprio placar final.
+  - **Desistir:** o Voltar ou o X pedem confirmação. Desistir conta como derrota e apaga a sala,
+    e o rival vence.
+- **Telas:**
+  - `DuelLobbyScreen`: itens, convites recebidos e amigos com DESAFIAR;
+  - `DuelWaitScreen`: aguardando o amigo, com "Chamar no WhatsApp" e Cancelar;
+  - `PlayScreen` em modo duelo: placar do rival no lugar do objetivo, bola caindo com o anel de
+    captura, botão do item e tinta azul durante o LENTO;
+  - `DuelResultScreen`: VITÓRIA, DERROTA ou EMPATE, os dois placares, os itens e REVANCHE;
+  - botão DUELO na Home, com o número de convites.
 
-## Servidor de produção (feito pelo usuário no console)
+## Testes
 
-1. Criar o **Realtime Database** em us-central1, no modo bloqueado.
-2. Publicar as regras em Realtime Database → Regras: colar `firebase/database.rules.json` e
-   clicar em Publicar.
-3. Pôr a URL do banco em `gradle.properties` como `dedo.firebaseDatabaseUrl`, por exemplo
-   `https://dedo-nervoso-7284-default-rtdb.firebaseio.com`. Levar essa URL até o
-   `online.properties` e até o `FirebaseConfig` do app faz parte do passo 1 de "Falta (app)".
+- `DuelEmulatorTest` e `DuelSessionTest` (core): protocolo e regras do motor.
+- `DuelFlowTest` (app, Robolectric contra os emuladores). O app joga um lado e o rival é uma
+  segunda conta que usa o `DuelService` direto:
+  - **desafio:** convite, aceite, partida com itens nos dois sentidos, VITÓRIA e sala fechada;
+  - **convite recebido:** diálogo, aceite, STOP recebido e desistência.
+
+## Produção
+
+1. Publique `firebase/database.rules.json` no projeto `dedo-nervoso-7284`. Pode ser pelo console,
+   em Realtime Database → Regras, ou, com o Firebase CLI logado, na pasta `firebase/`:
+   `npx --yes firebase-tools@13 deploy --only database --project prod`.
+2. Faça um duelo inteiro entre dois celulares com a versão 1.2.0.
