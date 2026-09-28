@@ -98,6 +98,8 @@ abstract class ProguardTask : DefaultTask() {
     @get:Classpath abstract val programClasspath: ConfigurableFileCollection
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val libraryJar: RegularFileProperty
     @get:InputFiles @get:PathSensitive(PathSensitivity.NONE) abstract val configFiles: ConfigurableFileCollection
+    /** Baseline rules text; written next to the generated config at execution time. */
+    @get:Input abstract val defaultRules: Property<String>
     @get:Input abstract val optimize: Property<Boolean>
     @get:Input abstract val obfuscate: Property<Boolean>
     @get:OutputFile abstract val outputJar: RegularFileProperty
@@ -129,7 +131,13 @@ abstract class ProguardTask : DefaultTask() {
             lines += "-dontoptimize"
         }
         if (!obfuscate.get()) lines += "-dontobfuscate"
-        configFiles.files.filter { it.isFile }.forEach { lines += "-include ${q(it)}" }
+        val defaults = File(temporaryDir, "proguard-android.pro")
+        defaults.writeText(defaultRules.get())
+        lines += "-include ${q(defaults)}"
+        configFiles.files.forEach { f ->
+            if (!f.isFile) throw GradleException("ProGuard config file not found: $f")
+            lines += "-include ${q(f)}"
+        }
         cfg.writeText(lines.joinToString("\n", postfix = "\n"))
 
         exec.javaexec {

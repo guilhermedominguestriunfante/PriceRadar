@@ -139,7 +139,8 @@ class AndroidApkPlugin : Plugin<Project> {
                 proguardClasspath.from(proguardConfig)
                 programClasspath.from(main.runtimeClasspath)
                 libraryJar.fileProvider(androidJar)
-                configFiles.from(defaultRulesFile(project), link.flatMap { it.proguardRules }, ext.proguardFiles)
+                defaultRules.set(DEFAULT_PROGUARD_RULES)
+                configFiles.from(link.flatMap { it.proguardRules }, ext.proguardFiles)
                 optimize.set(!debuggable)
                 obfuscate.set(!debuggable)
                 outputJar.set(build.file("intermediates/$variant/classes.jar"))
@@ -264,10 +265,9 @@ class AndroidApkPlugin : Plugin<Project> {
         )
     }
 
-    /** Baseline rules equivalent to AGP's proguard-android-optimize.txt. */
-    private fun defaultRulesFile(project: Project): File {
-        val file = project.layout.buildDirectory.file("intermediates/proguard-android.pro").get().asFile
-        val text = """
+    private companion object {
+        /** Baseline rules equivalent to AGP's proguard-android-optimize.txt (written by the task, so `clean` can't drop them). */
+        val DEFAULT_PROGUARD_RULES = """
             -dontusemixedcaseclassnames
             -keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
             -renamesourcefileattribute SourceFile
@@ -293,10 +293,5 @@ class AndroidApkPlugin : Plugin<Project> {
             -dontwarn org.intellij.lang.annotations.**
             -dontnote kotlin.**
         """.trimIndent() + "\n"
-        if (!file.isFile || file.readText() != text) {
-            file.parentFile.mkdirs()
-            file.writeText(text)
-        }
-        return file
     }
 }

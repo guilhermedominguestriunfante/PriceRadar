@@ -106,3 +106,60 @@ tasks.test {
         showStandardStreams = false
     }
 }
+
+// ---- Release smoke test ------------------------------------------------------------------------
+// Runs the shipped bytecode — ProGuard's optimized + obfuscated release output, i.e. the dexer's
+// input — under Robolectric, driving it only through public entry points (the activity class
+// name, touches, the save file). Catches shrinking/obfuscation breakage the unit tests can't see.
+val releaseSmoke: SourceSet = sourceSets.create("releaseSmoke")
+val sdkPlatformJar = provider { taptap.gradle.AndroidSdk.locate(project).platformJar(androidApk.compileSdk.get()) }
+val releaseLink = tasks.named<taptap.gradle.Aapt2LinkTask>("linkReleaseResources")
+val releaseSmokeConfig = tasks.register<taptap.gradle.RobolectricConfigTask>("releaseSmokeRobolectricConfig") {
+    manifest.set(releaseLink.flatMap { it.manifest })
+    resourcesApk.set(releaseLink.flatMap { it.resourcesApk })
+    assets.from(tasks.named("mergeAssets"))
+    packageName.set(androidApk.applicationId)
+    outputDir.set(layout.buildDirectory.dir("generated/robolectric-release"))
+}
+releaseSmoke.resources.srcDir(releaseSmokeConfig.flatMap { it.outputDir })
+listOf(releaseSmoke.compileClasspathConfigurationName, releaseSmoke.runtimeClasspathConfigurationName).forEach { name ->
+    configurations.named(name) { attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21) }
+}
+tasks.named<KotlinCompile>("compileReleaseSmokeKotlin") { compilerOptions.jvmTarget.set(JvmTarget.JVM_21) }
+tasks.named<JavaCompile>("compileReleaseSmokeJava") {
+    sourceCompatibility = "21"
+    targetCompatibility = "21"
+}
+dependencies {
+    "releaseSmokeImplementation"("junit:junit:4.13.2")
+    "releaseSmokeImplementation"("org.robolectric:robolectric:4.17") {
+        exclude(group = "androidx.test")
+        exclude(group = "androidx.test.espresso")
+    }
+    "releaseSmokeImplementation"(project(":testshim"))
+    "releaseSmokeCompileOnly"(files(sdkPlatformJar))
+    "releaseSmokeRuntimeOnly"(files(sdkPlatformJar))
+    // The app itself only as the release ProGuard output (no unobfuscated classes on this path).
+    "releaseSmokeRuntimeOnly"(files(tasks.named<taptap.gradle.ProguardTask>("proguardRelease").flatMap { it.outputJar }))
+}
+val releaseSmokeTest = tasks.register<Test>("releaseSmokeTest") {
+    group = "verification"
+    description = "Plays the optimized + obfuscated release bytecode end to end under Robolectric."
+    testClassesDirs = releaseSmoke.output.classesDirs
+    classpath = releaseSmoke.runtimeClasspath
+    useJUnit()
+    dependsOn(robolectricDeps)
+    maxHeapSize = "3g"
+    // ProGuard emits Java 7 bytecode without stack-map frames (-dontpreverify: dex has no use for
+    // them); the JVM would reject it, so skip verification of classes loaded by the sandbox.
+    jvmArgs("-XX:+UnlockDiagnosticVMOptions", "-XX:-BytecodeVerificationRemote")
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDeps.get().destinationDir.absolutePath)
+    systemProperty("robolectric.logging.enabled", "false")
+    systemProperty("taptap.screenshots", layout.buildDirectory.dir("screenshots-release").get().asFile.absolutePath)
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
+tasks.named("check") { dependsOn(releaseSmokeTest) }
