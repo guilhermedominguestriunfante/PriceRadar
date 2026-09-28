@@ -81,6 +81,7 @@ abstract class Strings {
     abstract val stageClear: String
     abstract val stageFailed: String
     abstract val outOfLives: String
+    abstract val timeUp: String
     abstract val newRecord: String
     abstract fun levelUp(level: Int): String
     abstract fun stageUnlocked(stage: Int): String

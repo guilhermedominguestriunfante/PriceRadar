@@ -77,6 +77,7 @@ object PtStrings : Strings() {
     override val stageClear = "FASE CONCLUÍDA!"
     override val stageFailed = "NÃO FOI DESSA VEZ"
     override val outOfLives = "SEM VIDAS"
+    override val timeUp = "TEMPO ESGOTADO!"
     override val newRecord = "NOVO RECORDE!"
     override fun levelUp(level: Int) = "NÍVEL $level!"
     override fun stageUnlocked(stage: Int) = "FASE $stage LIBERADA"
@@ -274,8 +275,8 @@ object PtStrings : Strings() {
     override val about = "SOBRE"
     override val version = "Versão"
     override val credits = "Créditos"
-    override val fontsCredit = "Fontes Orbitron e Rajdhani — SIL Open Font License 1.1"
-    override val privacyNote = "Sem anúncios. Sem conta. Seu progresso fica só neste aparelho."
+    override val fontsCredit = "Fontes TapTap Display (derivada da Orbitron) e Rajdhani — SIL Open Font License 1.1"
+    override val privacyNote = "Sem anúncios. Sem conta. Nenhum dado coletado — seu progresso fica salvo no aparelho."
     override val on = "ON"
     override val off = "OFF"
 }

@@ -810,6 +810,7 @@ class GameSession(
         for (attempt in 0 until PLACEMENT_ATTEMPTS) {
             px = rng.range(minX, maxX)
             py = rng.range(minY, maxY)
+            if (dist(px, py, 0.5f, arenaHeight / 2f) < GameBalance.CORE_CLEAR_RADIUS + radius) continue
             if (zones.none { it.active && dist(it.x(activeTimeMs), it.y(activeTimeMs), px, py) < it.radius(activeTimeMs) + radius + ZONE_SPACING }) break
         }
 
@@ -857,9 +858,18 @@ class GameSession(
                 slot.phase = rng.range(0f, (2 * Math.PI).toFloat())
             }
             ZoneMotion.TELEPORT -> {
-                for (i in 0 until Zone.TELEPORT_SLOTS) {
-                    slot.teleX[i] = if (i == 0) px else rng.range(minX, maxX)
-                    slot.teleY[i] = if (i == 0) py else rng.range(minY, maxY)
+                slot.teleX[0] = px
+                slot.teleY[0] = py
+                for (i in 1 until Zone.TELEPORT_SLOTS) {
+                    var tx = 0f
+                    var ty = 0f
+                    for (attempt in 0 until PLACEMENT_ATTEMPTS) {
+                        tx = rng.range(minX, maxX)
+                        ty = rng.range(minY, maxY)
+                        if (dist(tx, ty, 0.5f, arenaHeight / 2f) >= GameBalance.CORE_CLEAR_RADIUS + radius) break
+                    }
+                    slot.teleX[i] = tx
+                    slot.teleY[i] = ty
                 }
             }
             ZoneMotion.STATIC -> Unit

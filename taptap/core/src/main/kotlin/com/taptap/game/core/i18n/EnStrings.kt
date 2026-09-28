@@ -77,6 +77,7 @@ object EnStrings : Strings() {
     override val stageClear = "STAGE CLEAR!"
     override val stageFailed = "NOT THIS TIME"
     override val outOfLives = "OUT OF LIVES"
+    override val timeUp = "TIME'S UP!"
     override val newRecord = "NEW RECORD!"
     override fun levelUp(level: Int) = "LEVEL $level!"
     override fun stageUnlocked(stage: Int) = "STAGE $stage UNLOCKED"
@@ -274,8 +275,8 @@ object EnStrings : Strings() {
     override val about = "ABOUT"
     override val version = "Version"
     override val credits = "Credits"
-    override val fontsCredit = "Orbitron and Rajdhani fonts — SIL Open Font License 1.1"
-    override val privacyNote = "No ads. No account. Your progress stays on this device."
+    override val fontsCredit = "TapTap Display (derived from Orbitron) and Rajdhani fonts — SIL Open Font License 1.1"
+    override val privacyNote = "No ads. No account. No data collected — your progress is saved on this device."
     override val on = "ON"
     override val off = "OFF"
 }

@@ -49,6 +49,8 @@ object GameBalance {
     const val ZONE_BASE_RADIUS = 0.13f
     const val ZONE_CRITICAL_RADIUS = 0.07f
     const val ZONE_GOLDEN_RADIUS = 0.085f
+    /** Zones spawn outside this disc around the arena centre, where the HUD core shows the combo (moving zones may still cross it). */
+    const val CORE_CLEAR_RADIUS = 0.15f
     const val GOLDEN_COINS_MIN = 25
     const val GOLDEN_COINS_MAX = 60
     const val GOLDEN_LIFETIME_MS = 2_200L
