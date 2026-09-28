@@ -9,6 +9,14 @@ tasks.withType<JavaCompile>().configureEach {
     options.release.set(8)
 }
 
+// Robolectric's annotations target Java 11; they're only compiled against here and read by the
+// tests' JVM (21), so resolve the compile classpath for it.
+configurations.named("compileClasspath") {
+    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+}
+
 dependencies {
     compileOnly(files(provider { dedonervoso.gradle.AndroidSdk.locate(project).platformJar(35) }))
+    // ShadowAtomicFile (a test-only shadow); the tests bring Robolectric itself.
+    compileOnly("org.robolectric:annotations:4.17")
 }

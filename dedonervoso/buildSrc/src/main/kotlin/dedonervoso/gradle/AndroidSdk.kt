@@ -11,13 +11,14 @@ import java.util.Properties
  * SDK root resolution order: `sdk.dir` in `local.properties`, then `ANDROID_HOME`, then
  * `ANDROID_SDK_ROOT`. Build tools come from the newest `build-tools/<version>` directory that
  * contains `aapt2`; anything missing there is searched on the `PATH` (Debian/Ubuntu ship
- * `aapt2`, `dx`, `zipalign` and `apksigner` as regular system packages).
+ * `aapt2`, `dx`, `zipalign` and `apksigner` as regular system packages). On Windows the SDK's
+ * tools carry an extension (`aapt2.exe`, `d8.bat`, `apksigner.bat`…), which is tried as well.
  */
 class AndroidSdk(val root: File) {
 
     val buildToolsDir: File? by lazy {
         root.resolve("build-tools").listFiles()
-            ?.filter { File(it, "aapt2").canExecute() }
+            ?.filter { executable(it, "aapt2") != null }
             ?.maxWithOrNull(Comparator { a, b -> compareVersions(a.name, b.name) })
     }
 
@@ -34,7 +35,7 @@ class AndroidSdk(val root: File) {
 
     fun findTool(vararg names: String): File? {
         for (name in names) {
-            buildToolsDir?.resolve(name)?.takeIf { it.isFile && it.canExecute() }?.let { return it }
+            buildToolsDir?.let { executable(it, name) }?.let { return it }
         }
         for (name in names) {
             which(name)?.let { return it }
@@ -60,7 +61,7 @@ class AndroidSdk(val root: File) {
         }
 
     val adb: File?
-        get() = root.resolve("platform-tools/adb").takeIf { it.canExecute() } ?: which("adb")
+        get() = executable(root.resolve("platform-tools"), "adb") ?: which("adb")
 
     data class Dexer(val executable: File, val kind: Kind) {
         enum class Kind { D8, DX }
@@ -86,10 +87,16 @@ class AndroidSdk(val root: File) {
             return AndroidSdk(root)
         }
 
+        /** Extensions of executables: none on Unix; the Windows SDK ships `.exe` and `.bat` tools. */
+        private val EXTENSIONS = if (System.getProperty("os.name").orEmpty().startsWith("Windows")) listOf(".exe", ".bat", ".cmd", "") else listOf("")
+
+        /** [name] in [dir] as an executable file (trying the platform's extensions), or null. */
+        private fun executable(dir: File, name: String): File? =
+            EXTENSIONS.map { File(dir, name + it) }.firstOrNull { it.isFile && it.canExecute() }
+
         private fun which(name: String): File? =
             System.getenv("PATH").orEmpty().split(File.pathSeparator)
-                .map { File(it, name) }
-                .firstOrNull { it.isFile && it.canExecute() }
+                .firstNotNullOfOrNull { executable(File(it), name) }
 
         /** Numeric-aware comparison; non-numeric names (e.g. "debian") sort first. */
         private fun compareVersions(a: String, b: String): Int {

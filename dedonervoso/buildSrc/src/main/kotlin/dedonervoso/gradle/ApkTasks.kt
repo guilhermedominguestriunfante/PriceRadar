@@ -419,12 +419,13 @@ abstract class RobolectricConfigTask : DefaultTask() {
             md.update(f.readBytes())
         }
         val digest = md.digest().joinToString("") { "%02x".format(it) }
+        // Forward slashes: a backslash is an escape in .properties (Windows paths would be mangled).
         file.writeText(
             """
             dedo_inputs_sha256=$digest
-            android_merged_manifest=${manifest.get().asFile.absolutePath}
-            android_merged_assets=${assetsDir.absolutePath}
-            android_resource_apk=${resourcesApk.get().asFile.absolutePath}
+            android_merged_manifest=${manifest.get().asFile.absoluteFile.invariantSeparatorsPath}
+            android_merged_assets=${assetsDir.absoluteFile.invariantSeparatorsPath}
+            android_resource_apk=${resourcesApk.get().asFile.absoluteFile.invariantSeparatorsPath}
             android_custom_package=${packageName.get()}
             """.trimIndent() + "\n"
         )
