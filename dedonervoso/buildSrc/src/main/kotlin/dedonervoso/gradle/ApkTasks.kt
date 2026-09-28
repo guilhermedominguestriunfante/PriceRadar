@@ -196,7 +196,8 @@ abstract class DexTask : DefaultTask() {
 /**
  * Assembles the unsigned APK from the linked resources and the dex files. Media, fonts that are
  * streamed and `resources.arsc` are stored uncompressed (required by SoundPool file descriptors
- * and by Android 11+ for `resources.arsc`).
+ * and by Android 11+ for `resources.arsc`). Entry names always use `/`: the Windows aapt2 stores
+ * asset subfolders as `assets/sfx\tap1.wav`, which Android's AssetManager would never find.
  */
 @CacheableTask
 abstract class PackageApkTask : DefaultTask() {
@@ -214,9 +215,10 @@ abstract class PackageApkTask : DefaultTask() {
             ZipFile(resourcesApk.get().asFile).use { zf ->
                 val entries = zf.entries().toList().sortedBy { if (it.name == "AndroidManifest.xml") 0 else 1 }
                 for (e in entries) {
-                    if (e.isDirectory || !seen.add(e.name)) continue
+                    val name = e.name.replace('\\', '/')
+                    if (e.isDirectory || !seen.add(name)) continue
                     val bytes = zf.getInputStream(e).use { it.readBytes() }
-                    writeEntry(zos, e.name, bytes)
+                    writeEntry(zos, name, bytes)
                 }
             }
             dexDir.get().asFile.listFiles { f -> f.name.endsWith(".dex") }!!
@@ -419,12 +421,13 @@ abstract class RobolectricConfigTask : DefaultTask() {
             md.update(f.readBytes())
         }
         val digest = md.digest().joinToString("") { "%02x".format(it) }
+        // Forward slashes: a backslash is an escape in .properties (Windows paths would be mangled).
         file.writeText(
             """
             dedo_inputs_sha256=$digest
-            android_merged_manifest=${manifest.get().asFile.absolutePath}
-            android_merged_assets=${assetsDir.absolutePath}
-            android_resource_apk=${resourcesApk.get().asFile.absolutePath}
+            android_merged_manifest=${manifest.get().asFile.absoluteFile.invariantSeparatorsPath}
+            android_merged_assets=${assetsDir.absoluteFile.invariantSeparatorsPath}
+            android_resource_apk=${resourcesApk.get().asFile.absoluteFile.invariantSeparatorsPath}
             android_custom_package=${packageName.get()}
             """.trimIndent() + "\n"
         )

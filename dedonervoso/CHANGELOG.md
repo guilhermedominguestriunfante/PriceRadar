@@ -3,6 +3,33 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.2.0] — 2026-09-28 · Duelo ao vivo
+
+Duelos ao vivo entre amigos (versionCode 4), pelo Realtime Database do projeto
+`dedo-nervoso-7284`. O online passa a exigir esta versão.
+
+### Duelo
+- Botão DUELO na Home, com o online conectado. O lobby explica os itens e lista os desafios
+  recebidos e os amigos, cada um com DESAFIAR.
+- O convite chega na hora ("X te desafiou!"), com ACEITAR e RECUSAR, e nunca aparece no meio de
+  uma partida. O desafio expira em 60 s. Para chamar o amigo, dá para mandar mensagem pelo
+  WhatsApp.
+- Os dois começam juntos: o início é marcado pelo relógio do servidor, com o 3-2-1 sincronizado.
+- Na partida:
+  - o placar do rival e uma barra comparando os dois ficam no lugar do objetivo;
+  - quem mantém o ritmo enquanto uma bola cai captura o item dela: LENTO (9/s·3s), RELÓGIO
+    (11/s·4s) ou STOP (13/s·5s);
+  - o botão do item joga no rival, e o toque nele não conta como toque do jogo.
+- Não há pausa: sair do app não para o relógio, e o Voltar pergunta se quer desistir.
+- No resultado: VITÓRIA, DERROTA ou EMPATE, os dois placares e os itens. Se o rival não
+  terminar, é W.O. Dá para pedir REVANCHE.
+
+### Ferramentas
+- O build e os testes rodam no Windows com o SDK do Android Studio, sem WSL.
+- O `publishRelease` confere o APK antes de publicar: nomes de arquivo com `/` (o `aapt2` do
+  Windows gravava `\`), fontes, sons e a configuração do online.
+- `DuelFlowTest` joga o duelo inteiro contra os emuladores, dos dois lados.
+
 ## [1.1.1] — 2026-09-28 · Online ligado
 
 Primeira versão com o online ligado (versionCode 3), no projeto Firebase `dedo-nervoso-7284`

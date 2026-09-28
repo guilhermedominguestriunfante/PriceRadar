@@ -34,6 +34,8 @@ class GameSession(
     val arenaHeight: Float,
     seed: Long,
     private val listener: GameListener = GameListener.NONE,
+    /** Live duel: orbs fall and items can be thrown and received (see [DuelItem]). */
+    val duel: Boolean = false,
 ) {
     private val rng = Rng(Rng.mix(seed, stage.seed))
 
@@ -209,6 +211,35 @@ class GameSession(
 
     private var nextTimeWarning = 0
 
+    // ---- live duel ---------------------------------------------------------------------------------
+    /** The duel's orbs in falling order (same for both players); empty outside duels. */
+    val orbs: List<DuelOrb> = if (duel) DuelPlan.orbs(Rng(Rng.mix(seed, ORB_SALT)), stage.durationMs) else emptyList()
+
+    /** Item captured and not thrown yet (one at a time: while held, orbs can't be captured). */
+    var heldItem: DuelItem? = null
+        private set
+    var itemsUsed: Int = 0
+        private set
+    var itemsReceived: Int = 0
+        private set
+    var clockLostMs: Long = 0L
+        private set
+    private var slowUntil = 0L
+    private var lastOrbMatchMs = 0L
+
+    /** The orb falling now, if any. */
+    val activeOrb: DuelOrb?
+        get() {
+            for (o in orbs) if (o.state == OrbState.FALLING) return o
+            return null
+        }
+
+    /** An opponent's SLOW is halving tap points. */
+    val slowActive: Boolean get() = matchTimeMs < slowUntil
+
+    val slowFraction: Float
+        get() = if (!slowActive) 0f else ((slowUntil - matchTimeMs).toFloat() / GameBalance.DUEL_SLOW_MS).coerceIn(0f, 1f)
+
     // ============================================================================================
     // Control
     // ============================================================================================
@@ -223,6 +254,90 @@ class GameSession(
     /** Advances the simulation to [nowMs]. Call once per frame. */
     fun update(nowMs: Long) {
         advanceTo(nowMs)
+        if (orbs.isNotEmpty()) updateOrbs()
+    }
+
+    /** Throws the held item (duels): returns it, or null when there is none or play is not running. */
+    fun useItem(nowMs: Long): DuelItem? {
+        advanceTo(nowMs)
+        val item = heldItem ?: return null
+        if (!state.isActive) return null
+        heldItem = null
+        itemsUsed++
+        listener.onItemUsed(item)
+        return item
+    }
+
+    /** An item thrown by the opponent lands; false when this match is not running any more. */
+    fun receiveItem(item: DuelItem, nowMs: Long): Boolean {
+        advanceTo(nowMs)
+        if (!state.isActive) return false
+        itemsReceived++
+        when (item) {
+            DuelItem.CLOCK -> {
+                val cut = min(GameBalance.DUEL_CLOCK_PENALTY_MS, max(0L, timeLeftMs - GameBalance.DUEL_MIN_TIME_LEFT_MS))
+                durationMs -= cut
+                clockLostMs += cut
+                recomputeTimeWarnings()
+            }
+            DuelItem.SLOW -> slowUntil = matchTimeMs + GameBalance.DUEL_SLOW_MS
+            DuelItem.STOP -> injectStop()
+        }
+        listener.onItemHit(item)
+        return true
+    }
+
+    private fun updateOrbs() {
+        val now = matchTimeMs
+        val dt = now - lastOrbMatchMs
+        lastOrbMatchMs = now
+        if (!state.isActive) return
+        for (orb in orbs) {
+            when (orb.state) {
+                OrbState.WAITING -> when {
+                    now >= orb.expireAtMs -> orb.state = OrbState.MISSED   // its whole fall was skipped
+                    now >= orb.spawnAtMs -> {
+                        orb.state = OrbState.FALLING
+                        listener.onOrbSpawn(orb)
+                    }
+                }
+                OrbState.FALLING -> {
+                    if (now >= orb.expireAtMs) {
+                        orb.state = OrbState.MISSED
+                        listener.onOrbMissed(orb)
+                    } else if (heldItem == null && dt > 0) {
+                        val step = dt.toFloat() / orb.item.holdMs
+                        orb.progress = if (tps.rate(lastRealMs) >= orb.item.requiredTps) min(1f, orb.progress + step)
+                        else max(0f, orb.progress - step * GameBalance.DUEL_ORB_DECAY)
+                        if (orb.progress >= 1f) {
+                            orb.state = OrbState.CAPTURED
+                            heldItem = orb.item
+                            listener.onOrbCaptured(orb)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    /** A thrown STOP: right away, or right after the hold that is running. */
+    private fun injectStop() {
+        val current = currentInterrupt
+        val warnAt = if (current != null) max(current.endAt, matchTimeMs) + FORCED_STOP_GAP_MS else matchTimeMs
+        val stop = Interrupt(
+            InterruptKind.STOP, warnAt, warnAt + GameBalance.DUEL_STOP_WARNING_MS,
+            warnAt + GameBalance.DUEL_STOP_WARNING_MS + GameBalance.DUEL_STOP_MS,
+        )
+        stop.forced = true
+        var at = nextInterrupt
+        while (at < interrupts.size && interrupts[at].warnAt <= warnAt) at++
+        interrupts.add(at, stop)
+        if (at + 1 < interrupts.size) {
+            val gap = (stage.stop?.warningMs ?: 0L) + FORCED_STOP_GAP_MS
+            val needed = stop.endAt + gap - interrupts[at + 1].warnAt
+            if (needed > 0) shiftInterruptsFrom(at + 1, needed)
+        }
     }
 
     fun pause(nowMs: Long) {
@@ -382,6 +497,7 @@ class GameSession(
         }
         if (state == GameState.FRENZY) p *= frenzyMultiplier
         if (goBoostActive) p *= GameBalance.FAKE_STOP_MULTIPLIER
+        if (slowActive) p *= GameBalance.DUEL_SLOW_FACTOR
         var points = max(1, p.roundToInt())
         if (perfect) {
             points += (tapValue * GameBalance.PERFECT_BONUS_TAPS * comboMultiplier * loadout.perfectBonusScale).roundToInt()
@@ -580,7 +696,7 @@ class GameSession(
             minWarn = it.endAt + gap
         }
         val limit = durationMs - GameBalance.INTERRUPT_END_MARGIN_MS
-        while (interrupts.size > from && interrupts.last().startAt > limit) interrupts.removeAt(interrupts.lastIndex)
+        while (interrupts.size > from && interrupts.last().startAt > limit && !interrupts.last().forced) interrupts.removeAt(interrupts.lastIndex)
     }
 
     // ============================================================================================
@@ -713,7 +829,7 @@ class GameSession(
                 return
             }
             nextInterrupt++
-            if (candidate.startAt > durationMs - GameBalance.INTERRUPT_END_MARGIN_MS) return
+            if (candidate.startAt > durationMs - GameBalance.INTERRUPT_END_MARGIN_MS && !candidate.forced) return
             interrupt = candidate
             currentInterrupt = candidate
             candidate.warned = true
@@ -987,5 +1103,7 @@ class GameSession(
         private const val FRENZY_MIN_TIME_LEFT_MS = 1_000L
         private const val MAX_BACKWARDS_MS = 1_000L
         private const val MAX_STEPS_PER_ADVANCE = 10_000
+        private const val ORB_SALT = 0x0B5L
+        private const val FORCED_STOP_GAP_MS = 400L
     }
 }

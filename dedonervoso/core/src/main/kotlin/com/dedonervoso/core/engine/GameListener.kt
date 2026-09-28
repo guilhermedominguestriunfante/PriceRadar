@@ -37,6 +37,15 @@ interface GameListener {
     fun onPaused() {}
     fun onFinished(result: MatchResult) {}
 
+    // ---- live duels ----
+    fun onOrbSpawn(orb: DuelOrb) {}
+    fun onOrbCaptured(orb: DuelOrb) {}
+    fun onOrbMissed(orb: DuelOrb) {}
+    /** This player threw [item]. */
+    fun onItemUsed(item: DuelItem) {}
+    /** The opponent's [item] landed. */
+    fun onItemHit(item: DuelItem) {}
+
     companion object {
         val NONE: GameListener = object : GameListener {}
     }

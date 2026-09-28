@@ -268,6 +268,7 @@ class ScreenHost(private val app: GameApp) {
             current?.let {
                 it.enter(width, height, insets)
                 app.music.engine.mode = it.musicMode
+                app.screenShown()
             }
         }
     }
@@ -285,6 +286,7 @@ class ScreenHost(private val app: GameApp) {
     private fun enter(screen: Screen) {
         screen.enter(width, height, insets)
         app.music.engine.mode = screen.musicMode
+        app.screenShown()
     }
 
     private fun navigate(fadeOut: Boolean = true, action: () -> Unit) {
@@ -320,6 +322,7 @@ class ScreenHost(private val app: GameApp) {
             }
         }
         current?.update(now, dt)
+        if (dialog == null && !transitioning) app.idleFrame()
         if (dialog != null) {
             dialogAge += dt
             for (b in dialogButtons) b.press += ((if (b.pressed) 1f else 0f) - b.press) * minOf(1f, dt * 18f)

@@ -12,20 +12,35 @@ class FirebaseConfig(
     val authBase: String = "https://identitytoolkit.googleapis.com/v1",
     val tokenBase: String = "https://securetoken.googleapis.com/v1",
     val firestoreBase: String = "https://firestore.googleapis.com/v1",
+    /** Realtime Database URL (live duels), e.g. `https://<project>-default-rtdb.firebaseio.com`. */
+    val databaseUrl: String = "",
+    /** Database namespace passed as `?ns=` (the emulator serves every namespace on one host). */
+    val databaseNs: String = "",
 ) {
     val configured: Boolean get() = projectId.isNotBlank() && apiKey.isNotBlank()
+
+    /** Live duels need the Realtime Database as well. */
+    val duelsConfigured: Boolean get() = configured && databaseUrl.isNotBlank()
 
     /** Resource name prefix of documents: `projects/<id>/databases/(default)/documents`. */
     val documentsRoot: String get() = "projects/$projectId/databases/(default)/documents"
 
     companion object {
         /** The Firebase Local Emulator Suite on [host] (`firebase emulators:start`). */
-        fun emulator(projectId: String, host: String = "127.0.0.1", authPort: Int = 9099, firestorePort: Int = 8080) = FirebaseConfig(
+        fun emulator(
+            projectId: String,
+            host: String = "127.0.0.1",
+            authPort: Int = 9099,
+            firestorePort: Int = 8080,
+            databasePort: Int = 9000,
+        ) = FirebaseConfig(
             projectId = projectId,
             apiKey = "emulator",
             authBase = "http://$host:$authPort/identitytoolkit.googleapis.com/v1",
             tokenBase = "http://$host:$authPort/securetoken.googleapis.com/v1",
             firestoreBase = "http://$host:$firestorePort/v1",
+            databaseUrl = "http://$host:$databasePort",
+            databaseNs = "$projectId-default-rtdb",
         )
     }
 }
@@ -104,6 +119,13 @@ class FirebaseClient(val config: FirebaseConfig, private val http: Http, private
 
     private fun ensureFresh(session: AuthSession) {
         if (session.idToken.isEmpty() || clock() >= session.expiresAtMs) refresh(session)
+    }
+
+    /** A valid ID token for [session] (refreshed when it is about to expire). */
+    fun freshToken(session: AuthSession): String {
+        requireConfigured()
+        ensureFresh(session)
+        return session.idToken
     }
 
     // ---- documents ------------------------------------------------------------------------------

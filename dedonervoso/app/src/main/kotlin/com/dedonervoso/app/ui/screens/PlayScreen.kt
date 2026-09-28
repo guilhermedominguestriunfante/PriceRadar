@@ -7,14 +7,20 @@ import android.graphics.RectF
 import android.os.SystemClock
 import android.view.MotionEvent
 import com.dedonervoso.app.GameApp
+import com.dedonervoso.app.platform.Duel
 import com.dedonervoso.core.audio.MusicMode
 import com.dedonervoso.core.audio.Sfx
 import com.dedonervoso.core.engine.BreakReason
+import com.dedonervoso.core.engine.DuelItem
+import com.dedonervoso.core.engine.DuelOrb
+import com.dedonervoso.core.engine.FailReason
+import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.GameListener
 import com.dedonervoso.core.engine.GameSession
 import com.dedonervoso.core.engine.GameState
 import com.dedonervoso.core.engine.IgnoreReason
 import com.dedonervoso.core.engine.InterruptKind
+import com.dedonervoso.core.engine.Loadout
 import com.dedonervoso.core.engine.MatchResult
 import com.dedonervoso.core.engine.ReflexGrade
 import com.dedonervoso.core.engine.ShieldType
@@ -23,9 +29,12 @@ import com.dedonervoso.core.engine.Zone
 import com.dedonervoso.core.engine.ZoneMotion
 import com.dedonervoso.core.engine.ZoneType
 import com.dedonervoso.core.stage.Mechanic
+import com.dedonervoso.core.stage.StageCatalog
 import com.dedonervoso.core.stage.StageConfig
 import com.dedonervoso.core.util.Ease
 import com.dedonervoso.app.ui.Button
+import com.dedonervoso.app.ui.Dialog
+import com.dedonervoso.app.ui.DuelArt
 import com.dedonervoso.app.ui.Icon
 import com.dedonervoso.app.ui.NumText
 import com.dedonervoso.app.ui.Palette
@@ -45,12 +54,17 @@ import kotlin.math.sin
  * timestamp; the session registers the tap first and then fires [GameListener] callbacks,
  * which only *schedule* feedback (particles, popups, sounds, haptics) — so effects can never
  * delay or drop a tap (spec §78: INPUT > VISUAL).
+ *
+ * With [duel] it is a live duel: the match starts at the time agreed with the rival, there is no
+ * pause (back asks to give up; leaving the app doesn't stop the clock), the rival's score takes
+ * the objective's place, orbs fall to be captured and the held item has its own button.
  */
 class PlayScreen(
     app: GameApp,
     private val stage: StageConfig,
     private val daily: Boolean = false,
     private val dailyTitle: String? = null,
+    private val duel: Duel.Match? = null,
 ) : Screen(app), GameListener {
 
     private enum class Phase { INTRO, PLAY, PAUSED, ENDING }
@@ -63,14 +77,16 @@ class PlayScreen(
     internal val arenaForTest: RectF get() = arena
     internal val inIntro: Boolean get() = phase == Phase.INTRO
     internal val isPaused: Boolean get() = phase == Phase.PAUSED
+    internal val itemRectForTest: RectF get() = itemRect
     private var result: MatchResult? = null
     private var endAge = 0f
     private var introMechanic: Mechanic? = null
-    private val seed = SystemClock.uptimeMillis() xor stage.seed
+    private val seed = duel?.seed ?: (SystemClock.uptimeMillis() xor stage.seed)
 
     // ---- layout
     private val arena = RectF()
     private val pauseRect = RectF()
+    private val itemRect = RectF()
     private val progressRect = RectF()
     private val frenzyBarRect = RectF()
     private var timerX = 0f
@@ -122,6 +138,18 @@ class PlayScreen(
     private var targetText = ""
     private var stageLabel = ""
 
+    // ---- live duel texts (built once per match)
+    private val rivalScoreText = NumText { app.strings.num(it) }
+    private var rivalLabel = ""
+    private var rivalLabelNick = ""
+    private var myNick = ""
+    private var slowLabel = ""
+    private var paceLabels = emptyArray<String>()
+    private var throwLabels = emptyArray<String>()
+    private var readyLabels = emptyArray<String>()
+    private var thrownLabels = emptyArray<String>()
+    private var hitLabels = emptyArray<String>()
+
     private lateinit var pauseButtons: List<Button>
 
     override val musicMode: MusicMode get() = if (stage.isBoss) MusicMode.BOSS else MusicMode.GAME
@@ -134,13 +162,26 @@ class PlayScreen(
         ui.popups.clear()
         ui.rings.clear()
         stageLabel = when {
+            duel != null -> s.duel
             daily -> dailyTitle ?: s.daily
             else -> "${s.stage} ${stage.number}"
         }
         targetText = "/ " + s.num(if (stage.type == com.dedonervoso.core.stage.StageType.BOSS) stage.scoreTarget.toLong() else stage.target.toLong())
+        if (duel != null) duelTexts()
         val m = stage.introduces
-        introMechanic = if (!daily && m != null && m !in app.progression.save.seenIntros) m else null
+        introMechanic = if (!daily && duel == null && m != null && m !in app.progression.save.seenIntros) m else null
         if (introMechanic == null) beginMatch()
+    }
+
+    private fun duelTexts() {
+        val items = DuelItem.values()
+        myNick = app.progression.save.profile.nickname
+        slowLabel = s.itemName(DuelItem.SLOW)
+        paceLabels = Array(items.size) { "${items[it].requiredTps.toInt()}/s" }
+        throwLabels = Array(items.size) { "${s.throwItem} ${s.itemName(items[it])}" }
+        readyLabels = Array(items.size) { s.itemReady(items[it]) }
+        thrownLabels = Array(items.size) { s.itemThrown(items[it]) }
+        hitLabels = Array(items.size) { s.itemHit(items[it]) }
     }
 
     override fun onExit() {
@@ -162,14 +203,25 @@ class PlayScreen(
         timerY = top + 34f * u
         progressRect.set(side, top + 30f * u, min(side + 150f * u, timerX - timerR - 14f * u), top + 38f * u)
         hudScoreY = top + 86f * u
-        bottomY = safe.bottom - 20f * u
-        arena.set(safe.left, top + 104f * u, safe.right, safe.bottom - 48f * u)
+        if (duel != null) {
+            // The item button takes the bottom strip; the frenzy bar moves under it.
+            bottomY = safe.bottom - 4f * u
+            itemRect.set(width / 2f - 110f * u, safe.bottom - 66f * u, width / 2f + 110f * u, safe.bottom - 16f * u)
+            arena.set(safe.left, top + 104f * u, safe.right, itemRect.top - 8f * u)
+        } else {
+            bottomY = safe.bottom - 20f * u
+            arena.set(safe.left, top + 104f * u, safe.right, safe.bottom - 48f * u)
+        }
         frenzyBarRect.set(side, bottomY - 5f * u, right, bottomY + 5f * u)
         coreX = arena.centerX()
         coreY = arena.centerY()
         coreR = min(arena.width(), arena.height()) * 0.13f
         if (session == null) {
-            session = GameSession(stage, app.progression.loadout, arena.height() / arena.width(), seed, this)
+            session = if (duel != null) {
+                GameSession(stage, Loadout.NONE, arena.height() / arena.width(), seed, this, duel = true).also { duel.attach(it) }
+            } else {
+                GameSession(stage, app.progression.loadout, arena.height() / arena.width(), seed, this)
+            }
         }
         // Pause overlay buttons.
         val bw = min(width - 80f * u, 280f * u)
@@ -210,7 +262,23 @@ class PlayScreen(
 
     private fun beginMatch() {
         phase = Phase.PLAY
-        session?.start(SystemClock.uptimeMillis())
+        // A duel starts at the time agreed with the rival (see Duel.Match.drive).
+        if (duel == null) session?.start(SystemClock.uptimeMillis())
+    }
+
+    /** Duels have no pause: leaving is giving up, after a confirmation (the match goes on meanwhile). */
+    private fun askGiveUp() {
+        val m = duel ?: return
+        if (phase != Phase.PLAY) return
+        app.host.showDialog(
+            Dialog(s.giveUpTitle, s.giveUpText, listOf(s.keepPlaying to {}, s.giveUp to { m.giveUp() }), danger = true),
+        )
+    }
+
+    private fun throwItem() {
+        val m = duel ?: return
+        val item = session?.useItem(SystemClock.uptimeMillis()) ?: return
+        m.throwItem(item)
     }
 
     private fun pause() {
@@ -242,6 +310,10 @@ class PlayScreen(
     }
 
     override fun onBack(): Boolean {
+        if (duel != null) {
+            askGiveUp()
+            return true
+        }
         when (phase) {
             Phase.PLAY -> pause()
             Phase.PAUSED -> resume()
@@ -252,7 +324,8 @@ class PlayScreen(
     }
 
     override fun onAppPause() {
-        if (phase == Phase.PLAY) pause()
+        // A duel keeps running while the app is away (Duel ticks it); only solo matches pause.
+        if (phase == Phase.PLAY && duel == null) pause()
     }
 
     // ============================================================================================
@@ -284,6 +357,11 @@ class PlayScreen(
                     pausePointer = e.getPointerId(i)
                     return true
                 }
+                // The item button throws; its touches are not taps of the game.
+                if (duel != null && itemRect.contains(x, y)) {
+                    throwItem()
+                    return true
+                }
                 // Register the tap first; all feedback follows from listener callbacks.
                 sess.tap(e.eventTime, toArenaX(x), toArenaY(y), e.pointerCount, SystemClock.uptimeMillis())
             }
@@ -293,7 +371,7 @@ class PlayScreen(
                     pausePointer = -1
                     if (pauseRect.contains(e.getX(i), e.getY(i)) || abs(e.getX(i) - pauseRect.centerX()) < 40f * u) {
                         app.sfx.play(Sfx.UI_CLICK)
-                        pause()
+                        if (duel != null) askGiveUp() else pause()
                     }
                 }
             }
@@ -314,7 +392,7 @@ class PlayScreen(
     override fun update(now: Long, dt: Float) {
         super.update(now, dt)
         val sess = session
-        if (sess != null && phase == Phase.PLAY) sess.update(now)
+        if (duel != null) duel.drive(now) else if (sess != null && phase == Phase.PLAY) sess.update(now)
         val st = sess?.state
         val fxScale = if (st == GameState.STOP) 0.15f else 1f
         ui.particles.update(dt * fxScale)
@@ -378,6 +456,11 @@ class PlayScreen(
     private fun finishToResults() {
         val r = result ?: return
         result = null
+        if (duel != null) {
+            // Duels leave progression alone: the result screen waits for the rival's score.
+            app.host.replace(DuelResultScreen(app, duel))
+            return
+        }
         val outcome = app.progression.applyMatch(r, stage, daily)
         app.online.submit(outcome)
         app.host.replace(ResultScreen(app, outcome, dailyTitle))
@@ -661,12 +744,74 @@ class PlayScreen(
         if (secondsLeft == 10) banner(s.lastSeconds, Palette.ORANGE, 1f, big = false)
     }
 
+    override fun onOrbSpawn(orb: DuelOrb) {
+        app.sfx.play(Sfx.ZONE_SPAWN, 0.9f, 0.8f)
+        ui.popups.add(paceLabels[orb.item.ordinal], toScreenX(orb.x), arena.top + 30f * u, DuelArt.color(orb.item), 20f, 1f, 30f, 0)
+    }
+
+    override fun onOrbCaptured(orb: DuelOrb) {
+        val sess = session ?: return
+        val x = toScreenX(orb.x)
+        val y = orbY(orb, sess)
+        val color = DuelArt.color(orb.item)
+        app.sfx.play(Sfx.GOLDEN)
+        app.haptics.celebrate()
+        banner(readyLabels[orb.item.ordinal], color, 1.2f, big = false)
+        ui.rings.add(x, y, 10f, 90f, color, 0.5f, 4f)
+        ui.particles.burst(x, y, 36, itemSprite(orb.item), 120f, 420f, 3f, 8f, 0.6f, Particles.SPARK)
+    }
+
+    override fun onOrbMissed(orb: DuelOrb) {
+        app.sfx.play(Sfx.FRENZY_END, 0.4f, 1.3f)
+    }
+
+    override fun onItemUsed(item: DuelItem) {
+        val color = DuelArt.color(item)
+        app.sfx.play(Sfx.CRIT)
+        app.haptics.click()
+        banner(thrownLabels[item.ordinal], color, 1f, big = false)
+        ui.rings.add(itemRect.centerX(), itemRect.centerY(), 10f, 140f, color, 0.5f, 4f)
+        ui.particles.burst(itemRect.centerX(), itemRect.centerY(), 30, itemSprite(item), 200f, 600f, 3f, 8f, 0.6f, Particles.SPARK, angle = -1.57f, spread = 1.2f)
+    }
+
+    override fun onItemHit(item: DuelItem) {
+        val color = DuelArt.color(item)
+        banner(hitLabels[item.ordinal], color, 1.3f)
+        flash(color, 0.45f)
+        shake.add(0.3f)
+        app.haptics.error()
+        when (item) {
+            DuelItem.SLOW -> app.sfx.play(Sfx.FRENZY_END, 1f, 0.7f)
+            DuelItem.CLOCK -> {
+                app.sfx.play(Sfx.TIME_BONUS, 1f, 0.7f)
+                timerPulse = 1f
+                ui.popups.add("-${GameBalance.DUEL_CLOCK_PENALTY_MS / 1000}s", timerX, timerY + timerR + 20f * u, Palette.GOLD, 20f, 1f, 30f, 0)
+            }
+            DuelItem.STOP -> app.sfx.play(Sfx.STOP_WARN)
+        }
+    }
+
+    private fun itemSprite(item: DuelItem): Int = when (item) {
+        DuelItem.SLOW -> Palette.S_BLUE
+        DuelItem.CLOCK -> Palette.S_GOLD
+        DuelItem.STOP -> Palette.S_RED
+    }
+
     override fun onFinished(result: MatchResult) {
         this.result = result
         phase = Phase.ENDING
         endAge = age
         app.haptics.suppressTaps = false
         app.music.engine.frenzy = false
+        if (duel != null) {
+            app.sfx.play(Sfx.FRENZY_END)
+            when {
+                result.failReason != FailReason.ABORTED -> banner(s.timeUp, Palette.CYAN, END_DELAY_S)
+                duel.reason == Duel.Reason.RIVAL_GAVE_UP -> banner(s.rivalGaveUp, Palette.GREEN, END_DELAY_S, big = false)
+                else -> banner(s.youGaveUp, Palette.RED, END_DELAY_S, big = false)
+            }
+            return
+        }
         if (result.won) {
             app.sfx.play(Sfx.WIN)
             app.haptics.celebrate()
@@ -695,6 +840,7 @@ class PlayScreen(
             drawCore(c, sess)
             drawZones(c, sess)
             if (sess.lockActive) drawLock(c, sess)
+            if (duel != null) drawOrb(c, sess)
         }
         ui.rings.draw(c)
         ui.particles.draw(c)
@@ -702,6 +848,7 @@ class PlayScreen(
         if (sess != null) drawHud(c, sess)
         c.restore()
         if (sess != null) {
+            if (sess.slowActive) drawSlowTint(c, sess)
             drawWarning(c, sess)
             drawHold(c, sess)
             drawFrenzyBorder(c, sess)
@@ -709,6 +856,7 @@ class PlayScreen(
         drawFlash(c)
         drawBanners(c)
         if (sess != null) drawCountdown(c, sess)
+        if (duel != null && sess?.state == GameState.READY) drawFaceOff(c, duel)
         when (phase) {
             Phase.PAUSED -> drawPause(c)
             Phase.INTRO -> drawIntro(c)
@@ -850,6 +998,21 @@ class PlayScreen(
     }
 
     private fun drawHud(c: Canvas, sess: GameSession) {
+        if (duel != null) drawRivalPanel(c, sess, duel) else drawObjective(c, sess)
+        drawTimerScoreAndButton(c, sess)
+        if (duel != null) {
+            if (sess.slowActive) {
+                val lbl = ui.style(ui.textPaint, 11f, Palette.DIM, Paint.Align.LEFT)
+                val sp = ui.style(ui.displayBoldPaint, 11f, Palette.BLUE, Paint.Align.LEFT)
+                c.drawText(slowLabel, safe.left + 4f * u + lbl.measureText("SCORE") + 8f * u, hudScoreY - 18f * u, sp)
+            }
+            drawItemButton(c, sess)
+            return
+        }
+        drawBottomBar(c, sess)
+    }
+
+    private fun drawObjective(c: Canvas, sess: GameSession) {
         val neon = ui.neon
         // Stage label + objective progress.
         val lp = ui.style(ui.textPaint, 14f, Visuals.typeColor(stage.type), Paint.Align.LEFT)
@@ -869,7 +1032,10 @@ class PlayScreen(
             val w = pp.measureText(progressText.of(progress))
             c.drawText(targetText, progressRect.left + w + 4f * u, progressRect.bottom + 16f * u, pp)
         }
+    }
 
+    private fun drawTimerScoreAndButton(c: Canvas, sess: GameSession) {
+        val neon = ui.neon
         // Timer ring.
         val left = sess.timeLeftMs
         val urgent = left <= 10_000 && sess.state.isActive
@@ -895,11 +1061,13 @@ class PlayScreen(
         sp.color = Palette.CYAN
         c.drawText(tapsText.of(sess.taps), safe.right - 4f * u, hudScoreY + 4f * u, sp)
 
-        // Pause button.
+        // Pause button (in a duel: give up).
         neon.circle(c, pauseRect.centerX(), pauseRect.centerY(), pauseRect.width() / 2f, Palette.withAlpha(Palette.PANEL, 0.9f))
         neon.circleStroke(c, pauseRect.centerX(), pauseRect.centerY(), pauseRect.width() / 2f, Palette.withAlpha(Palette.CYAN, 0.7f), 1.5f * u)
-        ui.icons.draw(c, Icon.PAUSE, pauseRect.centerX(), pauseRect.centerY(), pauseRect.width() * 0.42f, Palette.CYAN)
+        ui.icons.draw(c, if (duel != null) Icon.CLOSE else Icon.PAUSE, pauseRect.centerX(), pauseRect.centerY(), pauseRect.width() * 0.42f, Palette.CYAN)
+    }
 
+    private fun drawBottomBar(c: Canvas, sess: GameSession) {
         // Bottom bar: lives, shields.
         var x = safe.left + 16f * u
         val by = bottomY - 18f * u
@@ -927,6 +1095,95 @@ class PlayScreen(
             val gp = ui.style(ui.displayBoldPaint, 14f, Palette.GREEN, Paint.Align.RIGHT)
             c.drawText("GO x2", safe.right - 8f * u, by + 5f * u, gp)
         }
+    }
+
+    // ---- live duel --------------------------------------------------------------------------------
+
+    private fun orbY(orb: DuelOrb, sess: GameSession): Float {
+        val r = ORB_R * u
+        return arena.top + r + orb.fall(sess.matchTimeMs) * (arena.height() - 2f * r)
+    }
+
+    /** The falling orb with its capture ring and the pace it asks for (dimmed while an item is held). */
+    private fun drawOrb(c: Canvas, sess: GameSession) {
+        val orb = sess.activeOrb ?: return
+        val r = ORB_R * u
+        val x = toScreenX(orb.x)
+        val y = orbY(orb, sess)
+        val locked = sess.heldItem != null
+        val alpha = if (locked) 0.45f else 1f
+        val color = DuelArt.color(orb.item)
+        val fast = !locked && displayTps >= orb.item.requiredTps
+        for (k in 1..3) ui.neon.circle(c, x, y - k * r * 0.55f, r * (1f - k * 0.2f), Palette.withAlpha(color, 0.08f * alpha))
+        DuelArt.badge(c, ui, orb.item, x, y, r, alpha)
+        ui.neon.ring(c, x, y, r + 8f * u, orb.progress, if (fast) Palette.GREEN else color, 5f * u, Palette.withAlpha(Palette.WHITE, 0.12f * alpha))
+        if (locked) ui.icons.draw(c, Icon.LOCK, x + r * 0.8f, y - r * 0.8f, r * 0.5f, Palette.withAlpha(Palette.WHITE, 0.8f))
+        val tp = ui.style(ui.displayBoldPaint, 15f, Palette.withAlpha(if (fast) Palette.GREEN else Palette.WHITE, alpha), Paint.Align.CENTER)
+        c.drawText(paceLabels[orb.item.ordinal], x, y + r + 26f * u, tp)
+    }
+
+    /** In place of the objective: the rival, their score and a bar of the two scores. */
+    private fun drawRivalPanel(c: Canvas, sess: GameSession, m: Duel.Match) {
+        if (m.rivalNick != rivalLabelNick) {
+            rivalLabelNick = m.rivalNick
+            rivalLabel = "VS ${m.rivalNick}"
+        }
+        val color = Visuals.AVATAR_COLORS[m.rivalAvatar.coerceIn(0, Visuals.AVATAR_COLORS.lastIndex)]
+        val lp = ui.style(ui.textPaint, 14f, color, Paint.Align.LEFT)
+        ui.fitText(c, rivalLabel, progressRect.left, safe.top + 18f * u, lp, progressRect.width())
+        // This player's share of both scores (the fill) against the rival's (the track).
+        val total = sess.score + m.rivalScore
+        val share = if (total <= 0L) 0.5f else sess.score.toFloat() / total
+        ui.neon.bar(c, progressRect, share, Palette.CYAN, Palette.GREEN, Palette.withAlpha(Palette.MAGENTA, 0.6f))
+        val pp = ui.style(ui.displayBoldPaint, 13f, Palette.MAGENTA, Paint.Align.LEFT)
+        val text = rivalScoreText.of(m.rivalScore)
+        c.drawText(text, progressRect.left, progressRect.bottom + 16f * u, pp)
+        if (!m.rivalOnline) {
+            val op = ui.style(ui.textPaint, 11f, Palette.ORANGE, Paint.Align.LEFT)
+            c.drawText(s.rivalOffline, progressRect.left + pp.measureText(text) + 8f * u, progressRect.bottom + 16f * u, op)
+        }
+    }
+
+    private fun drawItemButton(c: Canvas, sess: GameSession) {
+        val r = itemRect
+        val held = sess.heldItem
+        if (held == null) {
+            ui.neon.panel(c, r, r.height() / 2f, Palette.withAlpha(Palette.PANEL, 0.55f), Palette.withAlpha(Palette.MUTED, 0.7f), 0.2f)
+            val p = ui.style(ui.textPaint, 14f, Palette.MUTED, Paint.Align.CENTER)
+            c.drawText(s.noItem, r.centerX(), r.centerY() + p.textSize * 0.35f, p)
+            return
+        }
+        val color = DuelArt.color(held)
+        val pulse = if (reduce) 0.5f else 0.5f + 0.5f * sin(ui.time * 6f)
+        ui.neon.glowBlob(c, r.centerX(), r.centerY(), r.width() * 0.6f, color, 0.2f + 0.2f * pulse)
+        ui.neon.panel(c, r, r.height() / 2f, Palette.withAlpha(Palette.mix(Palette.PANEL, color, 0.3f), 0.95f), color, 0.8f + pulse)
+        DuelArt.badge(c, ui, held, r.left + r.height() / 2f + 2f * u, r.centerY(), r.height() * 0.36f)
+        val p = ui.style(ui.displayPaint, 16f, Palette.WHITE, Paint.Align.LEFT)
+        ui.fitText(c, throwLabels[held.ordinal], r.left + r.height() + 6f * u, r.centerY() + p.textSize * 0.36f, p, r.width() - r.height() - 18f * u)
+    }
+
+    /** An opponent's SLOW: a blue tint while tap points are halved. */
+    private fun drawSlowTint(c: Canvas, sess: GameSession) {
+        val pulse = if (reduce) 0f else 0.04f * sin(ui.time * 5f)
+        overlayPaint.color = Palette.withAlpha(Palette.BLUE, 0.1f + 0.12f * sess.slowFraction + pulse)
+        c.drawRect(0f, 0f, width, height, overlayPaint)
+    }
+
+    /** Before the 3-2-1: both players face off until the agreed start. */
+    private fun drawFaceOff(c: Canvas, m: Duel.Match) {
+        overlayPaint.color = Palette.withAlpha(Palette.BG_TOP, 0.55f)
+        c.drawRect(0f, 0f, width, height, overlayPaint)
+        val cx = arena.centerX()
+        val cy = arena.centerY()
+        val np = ui.style(ui.displayPaint, 24f, Palette.CYAN, Paint.Align.CENTER)
+        ui.fitText(c, myNick, cx, cy - 74f * u, np, arena.width() - 40f * u)
+        val vp = ui.style(ui.displayPaint, 54f, Palette.WHITE, Paint.Align.CENTER)
+        ui.neon.glowText(c, "VS", cx, cy + vp.textSize * 0.36f, vp, Palette.MAGENTA, 20f * u)
+        np.textSize = 24f * u
+        np.color = Visuals.AVATAR_COLORS[m.rivalAvatar.coerceIn(0, Visuals.AVATAR_COLORS.lastIndex)]
+        ui.fitText(c, m.rivalNick, cx, cy + 96f * u, np, arena.width() - 40f * u)
+        val gp = ui.style(ui.textPaint, 18f, Palette.withAlpha(Palette.WHITE, 0.6f + 0.4f * sin(ui.time * 5f)), Paint.Align.CENTER)
+        c.drawText(s.getReady, cx, arena.bottom - 50f * u, gp)
     }
 
     private fun drawWarning(c: Canvas, sess: GameSession) {
@@ -1034,7 +1291,7 @@ class PlayScreen(
         }
         ui.neon.glowText(c, COUNT_LABELS[v.coerceIn(0, 3)], arena.centerX(), arena.centerY() + p.textSize * 0.36f, p, color, 26f * u)
         val op = ui.style(ui.semiPaint, 17f, Palette.WHITE, Paint.Align.CENTER)
-        ui.fitText(c, s.objectiveText(stage), arena.centerX(), arena.bottom - 40f * u, op, arena.width() - 40f * u)
+        ui.fitText(c, if (duel != null) rivalLabel else s.objectiveText(stage), arena.centerX(), arena.bottom - 40f * u, op, arena.width() - 40f * u)
         if (sess.resuming) {
             val rp = ui.style(ui.textPaint, 16f, Palette.DIM, Paint.Align.CENTER)
             c.drawText(s.resume, arena.centerX(), arena.top + 40f * u, rp)
@@ -1144,7 +1401,12 @@ class PlayScreen(
             return PlayScreen(app, config, daily = true, dailyTitle = app.strings.dailyTitle(template))
         }
 
+        /** The live duel [match], once its start time is set. */
+        fun duel(app: GameApp, match: Duel.Match) = PlayScreen(app, StageCatalog.duel(), duel = match)
+
         private const val END_DELAY_S = 1.6f
+        /** Radius of a duel's falling orb (layout units). */
+        private const val ORB_R = 30f
         private const val POPUP_PERFECT = 1
         private const val POPUP_POINTS = 2
         private val ZONE_LABELS = arrayOf("x2", "x3", "x5", "", "", "", "", "")

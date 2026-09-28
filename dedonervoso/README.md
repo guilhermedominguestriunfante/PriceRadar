@@ -147,6 +147,11 @@ container Ubuntu/Debian novo (por exemplo, uma sessão do Claude Code na nuvem),
 `bash tools/setup-cloud-toolchain.sh`. Ele instala o JDK e as ferramentas do Debian, baixa os
 `android.jar` e grava o `local.properties`.
 
+No **Windows**, o SDK do Android Studio serve direto (`aapt2.exe`, `d8.bat`, `apksigner.bat`…),
+sem WSL. Sem a `android-34`, os recursos são linkados contra a `android-35`. Deixe o projeto num
+caminho **sem espaços**, porque o Robolectric não encontra os próprios arquivos num caminho com
+espaço.
+
 ```bash
 ./gradlew assembleDebug         # app/build/outputs/apk/debug/dedo-nervoso-debug.apk
 ./gradlew assembleRelease       # app/build/outputs/apk/release/dedo-nervoso-release.apk

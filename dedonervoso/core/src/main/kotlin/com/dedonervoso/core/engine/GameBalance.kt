@@ -97,4 +97,19 @@ object GameBalance {
     // ---- Combo timer -------------------------------------------------------------------------
     const val COMBO_TIMEOUT_EASY_MS = 2_000L
     const val COMBO_TIMEOUT_HARD_MS = 900L
+
+    // ---- Live duels -----------------------------------------------------------------------------
+    /** Orbs start falling at these match times… */
+    val DUEL_ORB_TIMES_MS = longArrayOf(8_000L, 20_000L, 32_000L, 44_000L)
+    /** …and can be captured for this long. */
+    const val DUEL_ORB_LIFETIME_MS = 10_000L
+    /** Below the required rate, capture progress drains at this fraction of its fill speed. */
+    const val DUEL_ORB_DECAY = 0.5f
+    const val DUEL_CLOCK_PENALTY_MS = 3_000L
+    /** A CLOCK hit never leaves less than this to play. */
+    const val DUEL_MIN_TIME_LEFT_MS = 1_000L
+    const val DUEL_SLOW_MS = 5_000L
+    const val DUEL_SLOW_FACTOR = 0.5f
+    const val DUEL_STOP_WARNING_MS = 600L
+    const val DUEL_STOP_MS = 2_200L
 }

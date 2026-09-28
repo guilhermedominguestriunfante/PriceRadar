@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.security.MessageDigest
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.zip.ZipFile
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // Android application: rendering, input, audio, haptics and storage on top of :core.
@@ -18,8 +19,8 @@ androidApk {
     resourcesSdk.set(34)
     minSdk.set(26)
     targetSdk.set(35)
-    versionCode.set(3)
-    versionName.set("1.1.1")
+    versionCode.set(4)
+    versionName.set("1.2.0")
     apkBaseName.set("dedo-nervoso")
     proguardFiles.from("proguard-rules.pro")
 }
@@ -71,23 +72,29 @@ val generateSfx = tasks.register<JavaExec>("generateSfx") {
 androidApk.extraAssetDirs.from(generateSfx.map { layout.buildDirectory.dir("generated/assets").get() })
 
 // Online (Firebase) settings ship as assets/config/online.properties: the project ID
-// (dedo.firebaseProjectId in gradle.properties, or DEDO_FIREBASE_PROJECT_ID) and the project's public
+// (dedo.firebaseProjectId in gradle.properties, or DEDO_FIREBASE_PROJECT_ID), the Realtime Database
+// of live duels (dedo.firebaseDatabaseUrl, or DEDO_FIREBASE_DATABASE_URL) and the project's public
 // Web API key, which only comes from the environment (DEDO_FIREBASE_API_KEY) and is never committed.
 // Without the key the build still works and online features say they're unavailable.
 val onlineProjectId = providers.environmentVariable("DEDO_FIREBASE_PROJECT_ID")
     .orElse(providers.gradleProperty("dedo.firebaseProjectId")).orElse("")
+val onlineDatabaseUrl = providers.environmentVariable("DEDO_FIREBASE_DATABASE_URL")
+    .orElse(providers.gradleProperty("dedo.firebaseDatabaseUrl")).orElse("")
 val onlineApiKey = providers.environmentVariable("DEDO_FIREBASE_API_KEY").orElse("")
 val generateOnlineConfig = tasks.register("generateOnlineConfig") {
     group = "build"
     description = "Writes the Firebase project settings used by online play."
     val outDir = layout.buildDirectory.dir("generated/online-assets")
     inputs.property("projectId", onlineProjectId)
+    inputs.property("databaseUrl", onlineDatabaseUrl)
     inputs.property("apiKeyDigest", onlineApiKey.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } })
     outputs.dir(outDir)
     doLast {
         val file = outDir.get().file("config/online.properties").asFile
         file.parentFile.mkdirs()
-        file.writeText("projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\n")
+        file.writeText(
+            "projectId=${onlineProjectId.get().trim()}\napiKey=${onlineApiKey.get().trim()}\ndatabaseUrl=${onlineDatabaseUrl.get().trim()}\n",
+        )
         if (onlineProjectId.get().isBlank() || onlineApiKey.get().isBlank()) {
             logger.lifecycle("Online disabled in this build (DEDO_FIREBASE_API_KEY not set).")
         }
@@ -233,6 +240,15 @@ tasks.register("publishRelease") {
         if (verify.waitFor() != 0) throw GradleException("apksigner could not verify $apk:\n$certs")
         if ("Android Debug" in certs) {
             throw GradleException("Refusing to publish a release signed with the debug key: set DEDO_KEYSTORE_B64 / DEDO_KEYSTORE_PASSWORD.")
+        }
+        // What a device looks up must be there, under the exact names it uses.
+        val entries = ZipFile(apk).use { zip -> zip.entries().toList().map { it.name } }
+        entries.firstOrNull { '\\' in it }?.let { throw GradleException("Refusing to publish: APK entry '$it' has a backslash (Android would not find it).") }
+        for (needed in listOf("classes.dex", "resources.arsc", "assets/fonts/display_black.ttf", "assets/sfx/tap1.wav")) {
+            if (needed !in entries) throw GradleException("Refusing to publish: $needed is missing from the APK.")
+        }
+        if (online.get() && "assets/config/online.properties" !in entries) {
+            throw GradleException("Refusing to publish: the APK has no assets/config/online.properties.")
         }
         val bytes = apk.readBytes()
         val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

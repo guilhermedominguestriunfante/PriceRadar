@@ -34,6 +34,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
     private lateinit var shop: Button
     private lateinit var missions: Button
     private lateinit var daily: Button
+    private var duel: Button? = null
 
     override fun onEnter() {
         age = 0f
@@ -71,11 +72,22 @@ class HomeScreen(app: GameApp) : Screen(app) {
         val rowH = 50f * u
         val rowTop = link.rect.top - 14f * u - rowH
         val gap = 10f * u
-        val half = (right - side - gap) / 2f
-        missions = button(s.missions, Icon.LIST, Button.Style.SECONDARY, Palette.GREEN) { app.host.push(MissionsScreen(app)) }
-        missions.rect.set(side, rowTop, side + half, rowTop + rowH)
-        daily = button(s.daily, Icon.CALENDAR, Button.Style.SECONDARY, Palette.GOLD) { app.host.push(MissionsScreen(app, focusDaily = true)) }
-        daily.rect.set(side + half + gap, rowTop, right, rowTop + rowH)
+        // Live duels join the row (between missions and daily) once they can be played.
+        val slots = if (app.duel.available) 3 else 2
+        val slotW = (right - side - gap * (slots - 1)) / slots
+        // Three to a row, missions and daily give their icons' room to their (longer) labels.
+        val rowIcons = slots == 2
+        missions = button(s.missions, Icon.LIST.takeIf { rowIcons }, Button.Style.SECONDARY, Palette.GREEN) { app.host.push(MissionsScreen(app)) }
+        missions.rect.set(side, rowTop, side + slotW, rowTop + rowH)
+        duel = if (slots == 3) {
+            button(s.duel, Icon.BOLT, Button.Style.SECONDARY, Palette.MAGENTA) { app.host.push(DuelLobbyScreen(app)) }.apply {
+                rect.set(side + slotW + gap, rowTop, side + 2 * slotW + gap, rowTop + rowH)
+            }
+        } else {
+            null
+        }
+        daily = button(s.daily, Icon.CALENDAR.takeIf { rowIcons }, Button.Style.SECONDARY, Palette.GOLD) { app.host.push(MissionsScreen(app, focusDaily = true)) }
+        daily.rect.set(right - slotW, rowTop, right, rowTop + rowH)
 
         val tileH = 74f * u
         val tileTop = rowTop - 12f * u - tileH
@@ -140,6 +152,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
         val claim = p.claimableMissions
         missions.badge = if (claim > 0) claim.toString() else null
         daily.badge = if (p.dailyRewardAvailable) "!" else null
+        duel?.badge = app.duel.invites.size.takeIf { it > 0 }?.toString()
         shop.badge = if (p.affordableUpgrade() != null) "!" else null
         val sel = p.save.selectedStage
         prevStage.enabled = sel > 1
