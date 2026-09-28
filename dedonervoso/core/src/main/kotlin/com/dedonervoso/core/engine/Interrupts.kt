@@ -25,6 +25,8 @@ class Interrupt(
     var shielded = false
     /** Already pushed back once by a frenzy. */
     var postponed = false
+    /** Thrown by a duel opponent: plays even in the closing seconds. */
+    var forced = false
 
     val durationMs: Long get() = endAt - startAt
 

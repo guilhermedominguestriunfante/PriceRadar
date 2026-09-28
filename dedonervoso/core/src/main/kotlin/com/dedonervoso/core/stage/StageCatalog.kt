@@ -24,6 +24,33 @@ import kotlin.math.roundToInt
 object StageCatalog {
     const val BOSS_EVERY = 10
 
+    /** Stage number of live duels (outside the ladder). */
+    const val DUEL = -2
+
+    /**
+     * The live duel arena, played by both players with the same seed and no upgrades: a
+     * mid-ladder mix of STOP, REFLEX, FAKE STOP, multiplier zones and frenzy, plus the duel orbs.
+     * No TIME or COIN zones, so both matches last as long and stay about the duel.
+     */
+    fun duel(): StageConfig = StageConfig(
+        number = DUEL,
+        type = StageType.SCORE,
+        target = 0,
+        scoreTarget = 0,
+        star2Score = 0,
+        star3Score = 0,
+        stop = StopConfig(3, 4, 1_000, 2_000, warningMs = 450, graceMs = 260, reflexChance = 0.15f, fakeChance = 0.2f, minGapMs = 6_000),
+        zones = ZoneConfig(
+            spawnMinMs = 3_000, spawnMaxMs = 4_600, maxConcurrent = 2, lifeMinMs = 2_800, lifeMaxMs = 4_200,
+            weights = ZoneConfig.weights(ZoneType.X2 to 10, ZoneType.X3 to 5, ZoneType.X5 to 2, ZoneType.COMBO to 3),
+            driftChance = 0.25f,
+        ),
+        frenzy = FrenzyConfig(),
+        comboTimeoutMs = 1_500L,
+        penaltyTier = PenaltyTier.MEDIUM,
+        seed = Rng.mix(0x7A97A9L, 0xD0E1L),
+    )
+
     fun isBoss(number: Int) = number > 0 && number % BOSS_EVERY == 0
 
     fun stage(number: Int): StageConfig {
