@@ -9,3 +9,7 @@ keystore.properties
 *.iml
 captures/
 .DS_Store
+
+# Firebase emulator logs
+*-debug.log
+.firebase/
