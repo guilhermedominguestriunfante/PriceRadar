@@ -14,8 +14,17 @@ Os jogadores recebem o aviso de "Nova versão" dentro do jogo lendo
 
    Isso cria `release/dedo-nervoso.apk` e `release/version.json`. A tarefa recusa publicar
    um APK assinado com a chave de debug ou sem a configuração do online. Para um release
-   offline de propósito, use `-PofflineRelease=true`. Antes do merge, confira o servidor com
-   `bash firebase/verify-online.sh dedo-nervoso-7284`.
+   offline de propósito, use `-PofflineRelease=true`.
+
+   Antes do merge, confira o servidor de duas formas:
+   - com o script: `bash firebase/verify-online.sh dedo-nervoso-7284`;
+   - com o próprio código do jogo, inclusive o bytecode ofuscado do APK:
+
+     ```bash
+     DEDO_LIVE_FIREBASE=1 ./gradlew :core:test --tests '*OnlineLiveTest*' --rerun :app:releaseSmokeTest --rerun
+     ```
+
+   Os dois criam jogadores descartáveis e apagam tudo no fim.
 4. Fazer commit e **merge no main**. A partir daí:
    - quem abrir o jogo vê "NOVA VERSÃO x.y.z" com as novidades e o botão Baixar;
    - o link fixo de download passa a entregar a versão nova:

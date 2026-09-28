@@ -3,7 +3,7 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
-## [Não lançado] — 1.1.1
+## [1.1.1] — 2026-09-28 · Online ligado
 
 Primeira versão com o online ligado (versionCode 3), no projeto Firebase `dedo-nervoso-7284`
 (Firestore em São Paulo, login anônimo). O online passa a exigir esta versão.
@@ -18,6 +18,11 @@ Primeira versão com o online ligado (versionCode 3), no projeto Firebase `dedo-
 - `firebase/verify-online.sh` confere o projeto real do jeito que o jogo usa: login, renovação
   da sessão, regras, rankings (amigos, global, semana) e limpeza. A chave vem do ambiente ou do
   Firebase CLI e não aparece na saída.
+- Checagem ao vivo opcional (`DEDO_LIVE_FIREBASE=1`) contra o projeto real, com jogadores
+  descartáveis que são apagados no fim:
+  - `OnlineLiveTest` roda o código online do jogo: cadastro, amizade, sessão retomada, partida e
+    rankings, e confere que nada ficou para trás;
+  - o teste do release comprova que o bytecode ofuscado do APK entra online sozinho.
 - Os testes nunca falam com o projeto real, mesmo num build que tenha a chave.
 
 ## [1.1.0] — 2026-09-28 · Dedo Nervoso

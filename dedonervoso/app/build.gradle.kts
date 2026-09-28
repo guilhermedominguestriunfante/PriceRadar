@@ -187,6 +187,8 @@ val releaseSmokeTest = tasks.register<Test>("releaseSmokeTest") {
     systemProperty("robolectric.dependency.dir", robolectricDeps.get().destinationDir.absolutePath)
     systemProperty("robolectric.logging.enabled", "false")
     systemProperty("dedo.screenshots", layout.buildDirectory.dir("screenshots-release").get().asFile.absolutePath)
+    // Project of the opt-in live check (DEDO_LIVE_FIREBASE=1).
+    systemProperty("dedo.firebaseProjectId", onlineProjectId.get())
     testLogging {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

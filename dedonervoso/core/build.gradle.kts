@@ -28,6 +28,8 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("calibrate", System.getProperty("calibrate") ?: "false")
+    // Project of the opt-in live check (OnlineLiveTest).
+    systemProperty("dedo.firebaseProjectId", providers.gradleProperty("dedo.firebaseProjectId").getOrElse(""))
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
