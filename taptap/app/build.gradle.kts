@@ -53,6 +53,20 @@ tasks.named<JavaCompile>("compileTestJava") {
     targetCompatibility = "21"
 }
 
+// Sound effects are synthesised at build time (see core/audio/SfxBank.kt).
+val sfxGenerator: Configuration by configurations.creating
+val generateSfx = tasks.register<JavaExec>("generateSfx") {
+    group = "build"
+    description = "Renders the procedural sound effects to WAV assets."
+    val outDir = layout.buildDirectory.dir("generated/assets/sfx")
+    classpath = sfxGenerator
+    mainClass.set("com.taptap.tools.SfxGeneratorKt")
+    inputs.files(sfxGenerator)
+    outputs.dir(outDir)
+    argumentProviders.add(CommandLineArgumentProvider { listOf(outDir.get().asFile.absolutePath) })
+}
+androidApk.extraAssetDirs.from(generateSfx.map { layout.buildDirectory.dir("generated/assets").get() })
+
 // Robolectric resolves the Android framework jar offline from this configuration.
 val robolectricRuntime: Configuration by configurations.creating {
     isTransitive = false
@@ -60,6 +74,7 @@ val robolectricRuntime: Configuration by configurations.creating {
 
 dependencies {
     implementation(project(":core"))
+    sfxGenerator(project(":tools"))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17") {
