@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+keystore.properties
+*.jks
+*.keystore
+.idea/
+*.iml
+captures/
+.DS_Store
+
+# Firebase emulator logs
+*-debug.log
+.firebase/
