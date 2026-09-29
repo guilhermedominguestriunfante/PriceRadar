@@ -5,6 +5,7 @@ import com.dedonervoso.core.engine.ZoneType
 import com.dedonervoso.core.stage.FrenzyConfig
 import com.dedonervoso.core.stage.StageCatalog
 import com.dedonervoso.core.stage.StageConfig
+import com.dedonervoso.core.stage.StageTimes
 import com.dedonervoso.core.stage.StageType
 import com.dedonervoso.core.stage.StopConfig
 import com.dedonervoso.core.stage.ZoneConfig
@@ -45,12 +46,14 @@ object DailyChallenge {
         val seed = Rng.mix(0xDA7L, dayIndex)
         fun cfg(type: StageType, target: Int, lives: Int = 0, useStop: Boolean = true, useZones: Boolean = true, fill: Float = 1f) =
             StageConfig(
-                number = -1, type = type, target = target,
+                number = StageCatalog.DAILY, type = type, target = target,
                 scoreTarget = if (type == StageType.SCORE || type == StageType.BOSS) target else (expected * 0.7f).toInt(),
                 star2Score = (expected * 0.95f).toInt(), star3Score = (expected * 1.35f).toInt(),
                 lives = lives, stop = if (useStop) stop else null, zones = if (useZones) zones else null,
                 frenzy = FrenzyConfig(fillScale = fill), comboTimeoutMs = 1_500L, penaltyTier = PenaltyTier.MEDIUM,
                 seed = seed, customTitle = template.name,
+                endOnObjective = true,
+                star2TimeMs = StageTimes.forType(type).star2Ms, star3TimeMs = StageTimes.forType(type).star3Ms,
             )
         val config = when (template) {
             DailyTemplate.TAPS_NO_STOP_ERRORS ->
@@ -64,5 +67,5 @@ object DailyChallenge {
         return template to config
     }
 
-    fun rewardCoins(playerLevel: Int, streak: Int): Int = Economy.DAILY_BASE_COINS + 10 * playerLevel + 20 * minOf(streak, 7)
+    fun rewardCoins(playerLevel: Int, streak: Int): Int = Economy.DAILY_BASE_COINS + 4 * playerLevel + 10 * minOf(streak, 7)
 }

@@ -120,6 +120,9 @@ class GameSession(
         private set
     var badTimestamps: Int = 0
         private set
+    /** Touches outside a mandatory zone (errors that are not STOP faults). */
+    var misses: Int = 0
+        private set
     val tps = TpsMeter()
     private val limiter = TapLimiter()
     private var lastTapEventMs = Long.MIN_VALUE
@@ -186,6 +189,9 @@ class GameSession(
 
     val plannedInterrupts: Int get() = interrupts.size
 
+    /** SURVIVAL: holds to get through — the stage's target, or fewer when fewer were planned. */
+    private val survivalTarget: Int = min(stage.target, interrupts.count { it.kind != InterruptKind.FAKE_STOP })
+
     private var reflexAwaiting = false
     private var reflexGoAt = 0L
     private var reflexDeadline = 0L
@@ -233,6 +239,13 @@ class GameSession(
             for (o in orbs) if (o.state == OrbState.FALLING) return o
             return null
         }
+
+    // ---- boss ----------------------------------------------------------------------------------------
+    /** The boss of a boss stage (null elsewhere). Its health is the score target minus the score. */
+    val boss: Boss? = stage.boss?.let { Boss(it, stage.bossTier, arenaHeight, Rng(Rng.mix(seed, BOSS_SALT))).also { b -> b.start(0L) } }
+
+    val bossHealth: Long get() = max(0L, stage.scoreTarget - score)
+    val bossHealthFraction: Float get() = if (stage.scoreTarget <= 0) 0f else bossHealth.toFloat() / stage.scoreTarget
 
     /** An opponent's SLOW is halving tap points. */
     val slowActive: Boolean get() = matchTimeMs < slowUntil
@@ -355,6 +368,8 @@ class GameSession(
                 // Pausing during a hold ends it: resuming straight into a STOP would punish the
                 // first tap after "TAP!" (spec §36). Counts as survived if clean.
                 completeInterrupt(interrupt, fromPause = true)
+                // That hold may have been the last one a SURVIVAL stage needed.
+                if (state == GameState.FINISHED) return
             } else {
                 // Warning in progress: re-arm it so the full telegraph plays again after resume.
                 interrupt.warned = false
@@ -467,12 +482,28 @@ class GameSession(
                 hitDistance = d
             }
         }
-        if (hit == null && lockActive) {
+        // --- the boss (a zone over it takes the tap)
+        var bossHit = false
+        var bossPerfect = false
+        val b = boss
+        if (hit == null && b != null) {
+            val d = dist(x, y, b.x, b.y)
+            if (d <= b.radius * GameBalance.BOSS_HIT_TOLERANCE) {
+                if (b.shielded) {
+                    listener.onBossBlocked(x, y)
+                    return false
+                }
+                bossHit = true
+                bossPerfect = d <= b.radius * GameBalance.BOSS_PERFECT_FRACTION
+            }
+        }
+        if (hit == null && !bossHit && lockActive) {
+            misses++
             listener.onMiss(x, y)
             breakCombo(BreakReason.ZONE_MISS)
             return false
         }
-        val perfect = hit != null && stage.hasPerfect &&
+        val perfect = bossPerfect || hit != null && stage.hasPerfect &&
             hitDistance <= hit.radius(t) * loadout.perfectRadiusFraction * GameBalance.ZONE_HIT_TOLERANCE
 
         touches++
@@ -495,6 +526,7 @@ class GameSession(
         if (hit != null && (hit.type.isMultiplier || hit.type == ZoneType.CRITICAL)) {
             p *= hit.type.multiplier * loadout.zoneMultiplierBonus
         }
+        if (bossHit) p *= GameBalance.BOSS_HIT_MULT
         if (state == GameState.FRENZY) p *= frenzyMultiplier
         if (goBoostActive) p *= GameBalance.FAKE_STOP_MULTIPLIER
         if (slowActive) p *= GameBalance.DUEL_SLOW_FACTOR
@@ -509,9 +541,14 @@ class GameSession(
         val kind = when {
             perfect -> TapKind.PERFECT
             hit != null -> TapKind.ZONE
+            bossHit -> TapKind.BOSS
             else -> TapKind.NORMAL
         }
         listener.onTap(x, y, points, kind, hit, comboTier)
+        if (b != null) {
+            if (bossHit) b.onHit(activeTimeMs)
+            if (b.updateRage(bossHealthFraction)) listener.onBossRage(b.rage)
+        }
         if (tierUps > 0) {
             listener.onComboTier(comboTier, comboMultiplier)
             gainMeter(GameBalance.FRENZY_FILL_COMBO_TIER * tierUps)
@@ -528,7 +565,7 @@ class GameSession(
 
         // --- frenzy meter
         var gain = GameBalance.FRENZY_FILL_TAP
-        if (hit != null) gain += GameBalance.FRENZY_FILL_ZONE
+        if (hit != null || bossHit) gain += GameBalance.FRENZY_FILL_ZONE
         if (perfect) gain += GameBalance.FRENZY_FILL_PERFECT
         gainMeter(gain)
 
@@ -756,6 +793,7 @@ class GameSession(
         matchTimeMs += step
         if (activeClockRunning) {
             activeTimeMs += step
+            boss?.step(step)
             if (state != GameState.FRENZY && frenzyMeter > 0f && !frenzyQueued &&
                 activeTimeMs - lastMeterGainActiveMs > GameBalance.FRENZY_DECAY_DELAY_MS
             ) {
@@ -784,6 +822,7 @@ class GameSession(
             if (stage.zones != null) activeNext = min(activeNext, nextZoneSpawnActive)
             for (z in zones) if (z.active) activeNext = min(activeNext, z.expireAt + GameBalance.ZONE_EXPIRE_GRACE_MS)
             if (combo > 0 && state != GameState.FRENZY) activeNext = min(activeNext, lastComboActiveMs + stage.comboTimeoutMs)
+            boss?.let { activeNext = min(activeNext, it.nextEventAt()) }
             if (activeNext != Long.MAX_VALUE) next = min(next, matchTimeMs + max(0L, activeNext - activeTimeMs))
         }
         return max(next, matchTimeMs)
@@ -810,6 +849,9 @@ class GameSession(
             listener.onReflexResult(-1L, 0, ReflexGrade.MISSED)
         }
         processInterrupts(now)
+        // The hold that just ended may have completed a SURVIVAL stage.
+        if (state == GameState.FINISHED) return
+        if (activeClockRunning) boss?.let { processBoss(it) }
         if (activeClockRunning && stage.zones != null && activeTimeMs >= nextZoneSpawnActive) spawnZone()
         while (nextTimeWarning < GameBalance.TIME_WARNINGS_S.size &&
             now >= durationMs - GameBalance.TIME_WARNINGS_S[nextTimeWarning] * 1000L
@@ -875,6 +917,31 @@ class GameSession(
         currentInterrupt = null
         if (allowFrenzy && frenzyQueued && canStartFrenzy()) startFrenzy()
         checkObjective()
+    }
+
+    private fun processBoss(b: Boss) {
+        // Attacks are not telegraphed over a STOP or its warning.
+        val canAttack = currentInterrupt == null
+        var guard = 0
+        while (guard++ < 16) {
+            when (b.due(activeTimeMs, canAttack) ?: return) {
+                BossEvent.WARNING -> b.warning?.let { listener.onBossWarning(it) }
+                BossEvent.ATTACK_START -> b.attack?.let {
+                    if (it == BossAttack.CLOCK) stealTime()
+                    listener.onBossAttack(it)
+                }
+                BossEvent.ATTACK_END -> b.lastAttack?.let { listener.onBossAttackEnd(it) }
+                BossEvent.TELEPORT -> listener.onBossTeleport()
+            }
+        }
+    }
+
+    /** The CRONÔMETRO's attack: the clock loses time, never below a few seconds left. */
+    private fun stealTime() {
+        val cut = min(GameBalance.BOSS_CLOCK_MS, max(0L, timeLeftMs - GameBalance.BOSS_CLOCK_MIN_LEFT_MS))
+        if (cut <= 0) return
+        durationMs -= cut
+        recomputeTimeWarnings()
     }
 
     private fun recomputeTimeWarnings() {
@@ -995,14 +1062,14 @@ class GameSession(
 
     // ---- objective & end --------------------------------------------------------------------
 
-    /** Current progress towards the stage objective (SURVIVAL: errors made). */
+    /** Current progress towards the stage objective (SURVIVAL: holds got through). */
     val objectiveProgress: Long
         get() = when (stage.type) {
             StageType.SPEED -> taps
             StageType.SCORE, StageType.BOSS -> score
             StageType.COMBO -> maxCombo.toLong()
             StageType.PRECISION -> zoneHits.toLong()
-            StageType.SURVIVAL -> stopErrors.toLong()
+            StageType.SURVIVAL -> stopsSurvived.toLong()
             StageType.PERFECT -> perfects.toLong()
             StageType.FRENZY -> frenzies.toLong()
         }
@@ -1010,22 +1077,30 @@ class GameSession(
     val objectiveTarget: Long
         get() = when (stage.type) {
             StageType.BOSS -> stage.scoreTarget.toLong()
+            StageType.SURVIVAL -> survivalTarget.toLong()
             else -> stage.target.toLong()
         }
 
-    /** Whether the objective is currently satisfied (SURVIVAL/BOSS also need to reach the end). */
+    private val alive: Boolean get() = maxLives == 0 || lives > 0
+
+    /** Arena and duels: nothing to complete, only points to make. */
+    private val hasObjective: Boolean get() = stage.target > 0 || stage.scoreTarget > 0
+
+    /** Whether the objective is complete (SURVIVAL and BOSS also need a life left). */
     val objectiveMet: Boolean
         get() = when (stage.type) {
-            StageType.SURVIVAL -> stopErrors <= stage.target && (maxLives == 0 || lives > 0)
-            StageType.BOSS -> score >= stage.scoreTarget && (maxLives == 0 || lives > 0)
+            StageType.SURVIVAL -> alive && stopsSurvived >= survivalTarget
+            StageType.BOSS -> alive && score >= stage.scoreTarget
             else -> objectiveProgress >= objectiveTarget
         }
 
+    /** Announces a completed objective; a stage that [StageConfig.endOnObjective] ends right there. */
     private fun checkObjective() {
-        if (objectiveAnnounced || stage.type == StageType.SURVIVAL) return
+        if (objectiveAnnounced || state == GameState.FINISHED || !hasObjective) return
         if (objectiveMet) {
             objectiveAnnounced = true
             listener.onObjectiveComplete()
+            if (stage.endOnObjective) finish(FailReason.NONE)
         }
     }
 
@@ -1039,14 +1114,22 @@ class GameSession(
             currentInterrupt = null
         }
         state = GameState.FINISHED
-        val won = reason == FailReason.NONE && objectiveMet
+        // Reaching the time limit alive completes SURVIVAL even if fewer holds happened than planned.
+        val won = reason == FailReason.NONE && (objectiveMet || stage.type == StageType.SURVIVAL && alive)
         val failReason = when {
             won -> FailReason.NONE
             reason == FailReason.NONE -> FailReason.OBJECTIVE
             else -> reason
         }
-        val stars = if (!won) 0 else 1 + (if (score >= stage.star2Score) 1 else 0) + (if (score >= stage.star3Score) 1 else 0)
         val played = matchTimeMs
+        val gradeMs = played + GameBalance.STOP_ERROR_TIME_PENALTY_MS * stopErrors
+        val stars = when {
+            !won -> 0
+            // Every survivor finishes at the same moment: SURVIVAL grades the errors.
+            stage.type == StageType.SURVIVAL && stage.endOnObjective -> (3 - stopErrors).coerceIn(1, 3)
+            stage.timedStars -> 1 + (if (gradeMs <= stage.star2TimeMs) 1 else 0) + (if (gradeMs <= stage.star3TimeMs) 1 else 0)
+            else -> 1 + (if (score >= stage.star2Score) 1 else 0) + (if (score >= stage.star3Score) 1 else 0)
+        }
         val r = MatchResult(
             stageNumber = stage.number,
             stageType = stage.type,
@@ -1078,6 +1161,10 @@ class GameSession(
             objectiveTarget = objectiveTarget,
             droppedTaps = droppedTaps,
             badTimestamps = badTimestamps,
+            misses = misses,
+            bossHits = boss?.hits ?: 0,
+            limitMs = durationMs,
+            endedEarly = won && played < durationMs,
         )
         result = r
         listener.onFinished(r)
@@ -1104,6 +1191,7 @@ class GameSession(
         private const val MAX_BACKWARDS_MS = 1_000L
         private const val MAX_STEPS_PER_ADVANCE = 10_000
         private const val ORB_SALT = 0x0B5L
+        private const val BOSS_SALT = 0xB055L
         private const val FORCED_STOP_GAP_MS = 400L
     }
 }

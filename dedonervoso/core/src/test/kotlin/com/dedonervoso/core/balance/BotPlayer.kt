@@ -38,7 +38,8 @@ class BotProfile(
  * finite tapping speed, reaction delays to STOP/TAP!/GO, imperfect aim at zones.
  */
 object BotPlayer {
-    fun play(stage: StageConfig, loadout: Loadout, p: BotProfile, seed: Long): MatchResult {
+    /** Plays [stage]; with [abortAtMs] the match is abandoned at that match time (to sample the score). */
+    fun play(stage: StageConfig, loadout: Loadout, p: BotProfile, seed: Long, abortAtMs: Long = Long.MAX_VALUE): MatchResult {
         val rng = Rng(seed * 31 + 7)
         val s = GameSession(stage, loadout, ARENA_H, seed)
         var t = 0L
@@ -54,6 +55,7 @@ object BotPlayer {
         while (s.state != GameState.FINISHED && t < 200_000) {
             t += STEP
             s.update(t)
+            if (s.matchTimeMs >= abortAtMs) s.abort(t)
             val state = s.state
             val warning = s.warningActive
             if (warning && !lastWarning && rng.chance(p.cautious)) {
@@ -99,12 +101,27 @@ object BotPlayer {
     private fun aim(s: GameSession, rng: Rng, p: BotProfile): Triple<Float, Float, Boolean> {
         val at = s.activeTimeMs
         val target = s.zones.filter { it.active }.maxByOrNull { if (it.locked) 10f else it.type.multiplier }
+        val boss = s.boss?.takeIf { !it.shielded }
+        val zoneValue = target?.let { if (it.locked) 10f else it.type.multiplier } ?: 0f
+        if (boss != null && zoneValue <= GameBalance.BOSS_HIT_MULT && rng.chance(p.zoneFocus)) {
+            // A moving boss is harder to hit: the finger lags ~80 ms behind it.
+            val angle = rng.range(0f, 6.2831855f)
+            val r = kotlin.math.abs(gaussian(rng)) * (p.aimError + boss.speed * 0.08f)
+            return Triple(boss.x + cos(angle) * r, boss.y + sin(angle) * r, true)
+        }
         if (target != null && (target.locked || rng.chance(p.zoneFocus))) {
             val angle = rng.range(0f, 6.2831855f)
             val r = kotlin.math.abs(gaussian(rng)) * p.aimError
             return Triple(target.x(at) + cos(angle) * r, target.y(at) + sin(angle) * r, true)
         }
-        return Triple(0.5f + rng.range(-0.05f, 0.05f), ARENA_H * 0.6f + rng.range(-0.05f, 0.05f), false)
+        val shielded = s.boss?.takeIf { it.shielded }
+        var x = 0.5f + rng.range(-0.05f, 0.05f)
+        val y = ARENA_H * 0.6f + rng.range(-0.05f, 0.05f)
+        if (shielded != null && sqrt((x - shielded.x) * (x - shielded.x) + (y - shielded.y) * (y - shielded.y)) < shielded.radius * 1.3f) {
+            // Tapping a shielded boss does nothing: tap beside it.
+            x = if (shielded.x > 0.5f) 0.12f else 0.88f
+        }
+        return Triple(x, y, false)
     }
 
     private fun gaussian(rng: Rng): Float {

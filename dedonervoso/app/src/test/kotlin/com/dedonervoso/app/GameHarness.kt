@@ -43,6 +43,8 @@ class GameHarness {
         // Builds made with DEDO_FIREBASE_* set carry the real project: tests never talk to it.
         // Online tests point this at the emulators or the fake server before launching.
         if (Endpoints.firebaseOverride == null) Endpoints.firebaseOverride = FirebaseConfig("", "")
+        // The illustrations straight from the merged assets (see Endpoints.artOverride).
+        Endpoints.artOverride = { path -> File("build/intermediates/assets", path).takeIf { it.isFile }?.inputStream() }
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         frames(40)
         // The opening is skippable by a touch (as players do); flows start from what follows.

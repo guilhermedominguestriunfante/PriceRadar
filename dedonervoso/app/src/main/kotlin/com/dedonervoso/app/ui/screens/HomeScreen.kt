@@ -29,6 +29,7 @@ class HomeScreen(app: GameApp) : Screen(app) {
     private val levelText = NumText { it.toString() }
     private val stageText = NumText { "${app.strings.stage} $it" }
     private lateinit var play: Button
+    private lateinit var arena: Button
     private lateinit var prevStage: Button
     private lateinit var nextStage: Button
     private lateinit var shop: Button
@@ -105,12 +106,26 @@ class HomeScreen(app: GameApp) : Screen(app) {
             if (i == 0) shop = b
         }
 
+        // JOGAR, and the weekly ARENA beside it (locked until the first boss falls).
         val playH = 66f * u
         val playTop = tileTop - 18f * u - playH
-        val playW = minOf(w * 0.74f, 330f * u)
+        val rowW = minOf(right - side, 400f * u)
+        val rowLeft = w / 2f - rowW / 2f
+        val arenaW = rowW * 0.36f
         play = button(s.play, null, Button.Style.PRIMARY, Palette.CYAN) { startSelected() }
-        play.rect.set(w / 2f - playW / 2f, playTop, w / 2f + playW / 2f, playTop + playH)
+        play.rect.set(rowLeft, playTop, rowLeft + rowW - arenaW - gap, playTop + playH)
         play.pulse = true
+        val unlocked = app.progression.arenaUnlocked
+        arena = button(s.arena, if (unlocked) Icon.TROPHY else Icon.LOCK, Button.Style.SECONDARY, if (unlocked) Palette.GOLD else Palette.MUTED) {
+            if (app.progression.arenaUnlocked) {
+                app.host.push(PlayScreen.arena(app))
+            } else {
+                app.host.toast(s.arena, s.arenaLocked(com.dedonervoso.core.stage.StageCatalog.BOSS_EVERY), Icon.LOCK, Palette.ORANGE)
+            }
+        }.apply {
+            rect.set(play.rect.right + gap, playTop, rowLeft + rowW, playTop + playH)
+            sublabel = if (unlocked) s.arenaWeek else null
+        }
 
         val cardH = 96f * u
         val cardTop = playTop - 16f * u - cardH
@@ -185,9 +200,10 @@ class HomeScreen(app: GameApp) : Screen(app) {
     private fun appear(delay: Float): Float = Ease.outCubic(((age - delay) / 0.45f).coerceIn(0f, 1f))
 
     override fun draw(c: Canvas) {
-        drawBackdrop(c, gridAlpha = 0.9f, horizon = 0.66f)
+        val hero = ui.art.hero
+        if (hero != null) drawHero(c, hero) else drawBackdrop(c, gridAlpha = 0.9f, horizon = 0.66f)
         ui.rings.draw(c)
-        drawLogo(c)
+        if (hero == null) drawLogo(c)
         drawTopBar(c)
         drawStageCard(c)
         c.save()
@@ -196,6 +212,46 @@ class HomeScreen(app: GameApp) : Screen(app) {
         drawButtons(c)
         c.restore()
         ui.particles.draw(c)
+    }
+
+    /**
+     * The mascot fills the top of Home, breathing slowly; it fades into the dark behind the menu.
+     * Touching it throws sparks (see [onTouch]).
+     */
+    private fun drawHero(c: Canvas, hero: android.graphics.Bitmap) {
+        c.drawColor(0xFF050208.toInt())
+        val breathe = if (app.settings.reduceEffects) 0f else 0.012f * kotlin.math.sin(ui.time * 0.9f)
+        val a = appear(0f)
+        ui.art.drawCover(c, hero, width, cardRect.top + 40f * u, alignY = 0.28f, zoom = 1.02f + breathe, focusX = 0.5f, focusY = 0.35f, alpha = a)
+        if (fade == null || fadeTop != cardRect.top) {
+            fadeTop = cardRect.top
+            fade = android.graphics.LinearGradient(
+                0f, cardRect.top - 150f * u, 0f, cardRect.top + 40f * u, 0x00050208, 0xFF050208.toInt(), android.graphics.Shader.TileMode.CLAMP,
+            )
+            fadePaint.shader = fade
+        }
+        c.drawRect(0f, cardRect.top - 150f * u, width, height, fadePaint)
+        // A soft top shade keeps the level and coins readable.
+        topShade.color = 0x99050208.toInt()
+        c.drawRect(0f, 0f, width, safe.top + 56f * u, topShade)
+    }
+
+    private var fade: android.graphics.LinearGradient? = null
+    private var fadeTop = 0f
+    private val fadePaint = android.graphics.Paint()
+    private val topShade = android.graphics.Paint()
+
+    override fun onTouch(e: android.view.MotionEvent): Boolean {
+        // Tapping the mascot: sparks and a tap sound, just for fun.
+        if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN && ui.art.hero != null &&
+            e.y > levelRect.bottom + 8f * u && e.y < cardRect.top - 8f * u && buttons.none { it.visible && it.contains(e.x, e.y) }
+        ) {
+            ui.particles.burst(e.x, e.y, 18, Palette.S_GOLD, 120f, 480f, 3f, 7f, 0.6f, com.dedonervoso.app.ui.fx.Particles.SPARK)
+            ui.rings.add(e.x, e.y, 6f, 70f, Palette.ORANGE, 0.4f, 3f)
+            app.sfx.play(com.dedonervoso.core.audio.Sfx.TAP_ZONE, 0.7f)
+            app.haptics.tap()
+        }
+        return super.onTouch(e)
     }
 
     private fun drawLogo(c: Canvas) {
@@ -263,10 +319,11 @@ class HomeScreen(app: GameApp) : Screen(app) {
             ui.icons.draw(c, if (i < stars) Icon.STAR else Icon.STAR_OUTLINE, left + 9f * u + i * 20f * u, cardRect.top + 80f * u, 17f * u,
                 Palette.withAlpha(if (i < stars) Palette.GOLD else Palette.MUTED, a))
         }
-        val best = p.save.stageBest[n]
+        // The stage's record is its best time.
+        val best = p.save.stageBestTime[n]
         if (best != null && best > 0) {
             val bp = ui.style(ui.mediumPaint, 12f, Palette.withAlpha(Palette.DIM, a), Paint.Align.RIGHT)
-            c.drawText("${s.bestLabel} ${s.num(best)}", nextStage.rect.left - 8f * u, cardRect.top + 85f * u, bp)
+            c.drawText("${s.bestLabel} ${s.seconds(best)}", nextStage.rect.left - 8f * u, cardRect.top + 85f * u, bp)
         }
         c.restore()
     }

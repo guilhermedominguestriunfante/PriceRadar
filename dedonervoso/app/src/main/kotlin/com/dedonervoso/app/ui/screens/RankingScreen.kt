@@ -69,7 +69,7 @@ class RankingScreen(app: GameApp) : Screen(app) {
         latest = p.save.ranking.maxByOrNull { it.timestamp }
         val s = app.strings
         localRows = entries.map { e ->
-            val stageText = if (e.daily) s.daily else "${s.stage} ${e.stage}"
+            val stageText = s.arena
             LocalRow(e, s.num(e.score), "$stageText · COMBO ${s.num(e.maxCombo)} · ${s.dec1(e.maxTps)} ${s.tpsUnit}", dateFormat.format(Date(e.timestamp)))
         }
     }
@@ -111,7 +111,8 @@ class RankingScreen(app: GameApp) : Screen(app) {
     }
 
     override fun layout() {
-        val top = header(s.ranking)
+        // Every board ranks the weekly Arena (same stage for everyone, no upgrades).
+        val top = header("${s.ranking} · ${s.arena}")
         // ONLINE | THIS DEVICE
         val half = (safe.width() - 8f * u) / 2f
         for ((i, m) in Mode.values().withIndex()) {
@@ -192,7 +193,7 @@ class RankingScreen(app: GameApp) : Screen(app) {
     private fun layoutLocalContent() {
         scroll.contentHeight = entries.size * ROW * u + 12f * u
         if (entries.isEmpty()) {
-            message = s.noResults
+            message = s.noArenaResults
             centerButton(s.play, Palette.CYAN, Button.Style.PRIMARY) {
                 app.host.replace(PlayScreen.forStage(app, app.progression.save.selectedStage))
             }
@@ -227,7 +228,7 @@ class RankingScreen(app: GameApp) : Screen(app) {
                     messageTitle = "${s.friendCode}: ${online.friendCode}"
                     message = s.noFriendsYet
                 } else {
-                    message = s.noResults
+                    message = s.noArenaResults
                 }
             }
         }

@@ -6,7 +6,10 @@ class Stats {
     var totalTouches = 0L
     var matches = 0
     var wins = 0
+    /** Best score of a match before 1.3 (stages played the full time): the "classic record". */
     var bestScore = 0L
+    var arenaBest = 0L
+    var arenaMatches = 0
     var maxCombo = 0
     var maxTps = 0f
     var perfects = 0L

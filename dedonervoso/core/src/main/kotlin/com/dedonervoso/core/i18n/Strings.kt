@@ -1,5 +1,7 @@
 package com.dedonervoso.core.i18n
 
+import com.dedonervoso.core.engine.BossAttack
+import com.dedonervoso.core.engine.BossKind
 import com.dedonervoso.core.engine.DuelItem
 import com.dedonervoso.core.engine.ReflexGrade
 import com.dedonervoso.core.progression.DailyTemplate
@@ -92,7 +94,7 @@ abstract class Strings {
     abstract val xpLabel: String
 
     // ---- stage objectives
-    fun objectiveText(stage: StageConfig): String = objective(stage.type, stage.target, stage.scoreTarget)
+    fun objectiveText(stage: StageConfig): String = stage.boss?.let { bossObjective(it) } ?: objective(stage.type, stage.target, stage.scoreTarget)
     abstract fun objective(type: StageType, target: Int, scoreTarget: Int): String
     fun typeName(type: StageType): String = type.name
     abstract fun mechanicTitle(m: Mechanic): String
@@ -259,6 +261,35 @@ abstract class Strings {
     abstract fun itemHit(item: DuelItem): String
     abstract val throwItem: String
     abstract val noItem: String
+
+    // Stages that end on their objective, bosses and the Arena (1.3).
+    abstract val missionComplete: String
+    abstract fun bossName(kind: BossKind): String
+    abstract fun bossObjective(kind: BossKind): String
+    abstract val bossIncoming: String
+    abstract fun bossAttack(attack: BossAttack): String
+    abstract fun bossRage(rage: Int): String
+    abstract val bossBlocked: String
+    abstract val bossDefeated: String
+    abstract val timeLabel: String
+    abstract val precisionLabel: String
+    abstract val reflexLabel: String
+    abstract val avgMaxLabel: String
+    /** "★★★ até 32,0 s": the graded time a star count asks for. */
+    abstract fun starTime(stars: Int, time: String): String
+    abstract val survivalGrade: String
+    abstract val errorsPenalty: String
+    abstract val arena: String
+    abstract val arenaIntro: String
+    abstract fun arenaLocked(stage: Int): String
+    abstract val arenaRecord: String
+    abstract val arenaWeek: String
+    abstract fun topPercent(percent: Int): String
+    abstract val statArenaBest: String
+    abstract val noArenaResults: String
+
+    /** 34200 ms → "34,2 s" (pt) / "34.2 s" (en). */
+    fun seconds(ms: Long): String = "${dec1(ms / 1000f)} s"
 
     // ---- formatting ---------------------------------------------------------------------------------
 

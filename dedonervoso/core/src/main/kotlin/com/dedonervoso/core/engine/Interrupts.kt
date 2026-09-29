@@ -52,13 +52,17 @@ object InterruptPlanner {
         if (windowEnd <= windowStart) return result
         val segment = (windowEnd - windowStart) / count
         var earliest = windowStart
+        var holds = 0
         for (i in 0 until count) {
             val segStart = maxOf(windowStart + segment * i, earliest)
             val segEnd = windowStart + segment * (i + 1)
             if (segEnd <= segStart) continue
             val start = rng.betweenLong(segStart, segEnd)
             val roll = rng.nextFloat()
+            // SURVIVAL stages need their holds: once the remaining slots are all needed, no FAKE.
+            val mustHold = holds + (count - i) <= config.minHolds
             val kind = when {
+                mustHold && roll >= config.reflexChance -> InterruptKind.STOP
                 roll < config.reflexChance -> InterruptKind.REFLEX
                 roll < config.reflexChance + config.fakeChance -> InterruptKind.FAKE_STOP
                 else -> InterruptKind.STOP
@@ -76,6 +80,7 @@ object InterruptPlanner {
                 )
             }
             result += interrupt
+            if (kind != InterruptKind.FAKE_STOP) holds++
             earliest = interrupt.endAt + config.minGapMs + config.warningMs
         }
         return result

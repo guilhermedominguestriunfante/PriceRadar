@@ -40,7 +40,9 @@ class ProfileScreen(app: GameApp) : Screen(app) {
         val s = app.strings
         stats.clear()
         stats += s.statTotalTaps to s.num(st.totalTaps)
-        stats += s.statBestScore to s.num(st.bestScore)
+        stats += s.statArenaBest to s.num(st.arenaBest)
+        // Best match before stages ended on their objective (1.3), kept as the classic record.
+        if (st.bestScore > 0) stats += s.statBestScore to s.num(st.bestScore)
         stats += s.statMaxCombo to s.num(st.maxCombo)
         stats += s.statMaxTps to "${s.dec1(st.maxTps)} ${s.tpsUnit}"
         stats += s.statAvgTps to "${s.dec1(st.avgTps)} ${s.tpsUnit}"

@@ -1,8 +1,17 @@
 # Roadmap
 
-O que vem depois da 1.1.0, em ordem de prioridade.
+Plano aprovado em 2026-09-29, uma versão por vez, cada uma com um APK para testar:
 
-## Próximo (1.2) — Duelo ao vivo
+- **1.3 Campanha e Arena** (feita): fim da fase ao cumprir a missão, estrelas pelo tempo, bosses
+  com barra de vida, Arena semanal no ranking, economia mais difícil, abertura e visual novos.
+- **1.4 Identidade**: coleção de avatares, molduras, auras do Top 10, títulos, loja de cosméticos
+  (só TAP COINS; GLOBAL ELITE e prêmios de boss nunca à venda), ligas por temporada na Arena.
+- **1.5 Amigos e Boss Mundial**: fantasmas por fase, DESAFIAR AMIGO, melhor de 3 no duelo, itens
+  APAGÃO / BÔNUS FALSO / ESCUDO, boss mundial diário ao vivo (jogadores reais, ranking de dano).
+- **1.6 Variedade**: Eventos Nervosos (STOP RUSH, BLACKOUT, GOLD RUSH, PERFECT MODE, OVERLOAD),
+  comandos novos (SWIPE, HOLD, SEQUÊNCIA, círculo que encolhe), fases feitas à mão até a 50.
+
+## Feito (1.2) — Duelo ao vivo
 
 - **Convite**: escolher um amigo e convidar; se ele estiver com o jogo aberto, o convite aparece
   na hora; se não, vai um link pelo WhatsApp.

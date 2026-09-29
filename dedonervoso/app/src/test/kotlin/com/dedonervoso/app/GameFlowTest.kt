@@ -60,9 +60,12 @@ class GameFlowTest {
         val save = h.app.progression.save
         assertEquals(2, save.highestUnlocked)
         assertTrue(save.coins > 0)
-        assertTrue(save.stats.totalTaps > 200)
+        // Stage 1 (150 TAPs) ends the moment its objective is met.
+        assertTrue(save.stats.totalTaps >= 150)
         assertTrue(save.onboardingDone)
-        assertTrue(play.sessionForTest!!.result!!.won)
+        val result = play.sessionForTest!!.result!!
+        assertTrue(result.won && result.endedEarly)
+        assertEquals(result.gradeTimeMs, save.stageBestTime[1])
 
         // Close the app completely and reopen: progress must be there.
         h.controller.pause().stop().destroy()
@@ -126,6 +129,77 @@ class GameFlowTest {
     }
 
     @Test
+    fun bossFightRendersAttacksAndResults() {
+        val save = GameHarness.progressedSave()
+        save.seenIntros += com.dedonervoso.core.stage.Mechanic.values()
+        save.highestUnlocked = 21
+        save.selectedStage = 20
+        val h = GameHarness().launch(save)
+        h.click(h.app.strings.play, 60)
+        val shots = HashSet<String>()
+        h.playMatch(onFrame = { p, _ ->
+            val s = p.sessionForTest!!
+            val b = s.boss!!
+            fun shot(key: String) {
+                if (shots.add(key)) h.screenshot(key)
+            }
+            when {
+                s.state == GameState.FINISHED -> shot("46_boss_end")
+                s.state == GameState.COUNTDOWN && s.matchTimeMs == 0L -> shot("40_boss_countdown")
+                b.warning != null -> shot("42_boss_warning")
+                b.shielded -> shot("43_boss_shield")
+                b.charging -> shot("44_boss_charge")
+                s.state == GameState.STOP -> shot("45_boss_roar")
+                s.matchTimeMs > 5_000 -> shot("41_boss_fight")
+            }
+        })
+        assertTrue("reached results", h.app.host.current is ResultScreen)
+        assertTrue("the boss attacked", "42_boss_warning" in shots)
+        h.frames(220)
+        h.screenshot("47_boss_result")
+    }
+
+    @Test
+    fun everyBossIsDrawn() {
+        val save = GameHarness.progressedSave()
+        save.seenIntros += com.dedonervoso.core.stage.Mechanic.values()
+        save.highestUnlocked = 51
+        val h = GameHarness().launch(save)
+        for (n in listOf(10, 20, 30, 40, 50)) {
+            h.app.host.replace(PlayScreen.forStage(h.app, n))
+            h.frames(260)
+            val play = h.app.host.current as PlayScreen
+            assertTrue(play.sessionForTest!!.boss != null)
+            h.screenshot("48_boss_$n")
+        }
+    }
+
+    @Test
+    fun arenaPlaysTheFullMinuteWithoutUpgrades() {
+        val save = GameHarness.progressedSave()
+        save.seenIntros += com.dedonervoso.core.stage.Mechanic.values()
+        save.ranking.clear()
+        val h = GameHarness().launch(save)
+        h.click(h.app.strings.arena, 60)
+        val play = h.app.host.current as PlayScreen
+        assertEquals(1, play.sessionForTest!!.loadout.tapValue)
+        var shot = false
+        h.playMatch(onFrame = { p, _ ->
+            if (!shot && p.sessionForTest!!.matchTimeMs > 20_000) {
+                shot = true
+                h.screenshot("50_arena")
+            }
+        })
+        assertTrue(h.app.host.current is ResultScreen)
+        val r = play.sessionForTest!!.result!!
+        assertEquals(60_000L, r.playedMs)
+        assertTrue(h.app.progression.save.stats.arenaBest > 0)
+        assertEquals(1, h.app.progression.save.ranking.size)
+        h.frames(220)
+        h.screenshot("51_arena_result")
+    }
+
+    @Test
     fun menusRenderAndNavigate() {
         val h = GameHarness().launch(GameHarness.progressedSave())
         h.screenshot("30_home")
@@ -172,8 +246,12 @@ class GameFlowTest {
         val h = GameHarness().launch(GameHarness.progressedSave(), skipIntro = false)
         assertTrue("opening first", h.app.host.current is IntroScreen)
         h.frames(10)
-        h.screenshot("00_intro_name")
-        h.frames(120)
+        h.screenshot("00_intro_rise")
+        h.frames(62)
+        h.screenshot("00_intro_slam")
+        h.frames(50)
+        h.screenshot("00_intro_shouts")
+        h.frames(100)
         assertTrue("then Home without any touch", h.app.host.current is HomeScreen)
     }
 

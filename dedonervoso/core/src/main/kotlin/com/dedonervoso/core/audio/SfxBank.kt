@@ -19,6 +19,8 @@ enum class Sfx(val file: String) {
     LEVEL_UP("level_up"), ACHIEVEMENT("achievement"), STAR_1("star1"), STAR_2("star2"), STAR_3("star3"),
     TIME_BONUS("time_bonus"), SHIELD("shield"), ZONE_SPAWN("zone_spawn"), ZONE_POP("zone_pop"),
     GOLDEN("golden"), REFLEX_READY("reflex_ready"), INTRO("intro"),
+    BOSS_ROAR("boss_roar"), BOSS_HIT("boss_hit"), BOSS_ATTACK("boss_attack"), BOSS_DEFEAT("boss_defeat"),
+    MISSION("mission"), INTRO_SLAM("intro_slam"),
 }
 
 /**
@@ -337,6 +339,78 @@ object SfxBank {
             tone(0f, 0.24f, 440f, amp = 0.35f, attack = 0.01f, decay = 0.12f)
             tone(0f, 0.2f, 880f, wave = Wave.TRI, amp = 0.08f, attack = 0.01f, decay = 0.08f)
         }.finish(-9f)
+        Sfx.BOSS_ROAR -> Mix(1.4f).apply {
+            // A growl: detuned low saws with an uneven vibrato, a rumble and a throaty noise band.
+            for ((f, v) in listOf(62f to 5.5f, 66f to 7.1f, 93f to 6.3f)) {
+                tone(0f, 1.35f, f * 1.25f, f, wave = Wave.SAW, amp = 0.32f, attack = 0.12f, decay = 0.7f, glide = 0.9f, vibratoHz = v, vibratoDepth = 0.05f)
+            }
+            tone(0f, 1.2f, 45f, 34f, amp = 0.6f, attack = 0.08f, decay = 0.6f)
+            noise(0f, 1.3f, 0.35f, attack = 0.1f, decay = 0.6f, bp0 = 700f, bp1 = 260f, q = 3f)
+            lowPass(1800f, 600f, q = 1.3f, sweep = 1.2f)
+            drive(2.2f)
+        }.finish(-2f)
+        Sfx.BOSS_HIT -> Mix(0.16f).apply {
+            // Punchy thud of a finger on the boss.
+            tone(0f, 0.16f, 210f, 70f, amp = 0.8f, attack = 0.001f, decay = 0.05f, glide = 0.05f)
+            noise(0f, 0.03f, 0.35f, lp = 2600f, decay = 0.01f)
+            tapLayers(this, 900f)
+            drive(1.4f)
+        }.finish(-6f)
+        Sfx.BOSS_ATTACK -> Mix(0.8f).apply {
+            // Alarm horn and a rising whoosh: something is coming.
+            for (start in floatArrayOf(0f, 0.2f)) {
+                tone(start, 0.18f, hz(45), wave = Wave.SAW, amp = 0.3f, attack = 0.01f, decay = 0.2f)
+                tone(start, 0.18f, hz(52), wave = Wave.SAW, amp = 0.22f, attack = 0.01f, decay = 0.2f)
+            }
+            noise(0.3f, 0.5f, 0.3f, attack = 0.35f, bp0 = 300f, bp1 = 3500f, q = 2.5f)
+            lowPass(3000f)
+            drive(1.5f)
+        }.finish(-4f)
+        Sfx.BOSS_DEFEAT -> Mix(2.0f).apply {
+            // Explosion, then a triumphant major chord.
+            tone(0f, 0.8f, 90f, 28f, amp = 1f, attack = 0.002f, decay = 0.35f, glide = 0.3f)
+            noise(0f, 1.2f, 0.6f, decay = 0.4f, lp = 2400f)
+            noise(0f, 0.6f, 0.25f, decay = 0.2f, hp = 2500f)
+            for ((i, n) in intArrayOf(67, 72, 76, 79).withIndex()) tone(0.55f + i * 0.08f, 0.3f, hz(n), wave = Wave.SAW, amp = 0.16f, decay = 0.15f)
+            for (n in intArrayOf(60, 67, 72, 76, 79, 84)) {
+                tone(0.9f, 1.1f, hz(n), wave = Wave.SAW, amp = 0.09f, attack = 0.01f, decay = 0.55f, vibratoHz = 5f, vibratoDepth = 0.004f)
+            }
+            sparkle(this, 0.9f, 14, 0.05f)
+            lowPass(8000f)
+        }.finish(-1f)
+        Sfx.MISSION -> Mix(1.1f).apply {
+            // A punchy "done!": two hits and a bright chord.
+            for (start in floatArrayOf(0f, 0.13f)) {
+                tone(start, 0.12f, 160f, 60f, amp = 0.7f, decay = 0.05f, glide = 0.05f)
+                noise(start, 0.04f, 0.3f, hp = 3000f, decay = 0.012f)
+            }
+            for (n in intArrayOf(74, 78, 81, 86)) tone(0.26f, 0.8f, hz(n), wave = Wave.SAW, amp = 0.12f, attack = 0.005f, decay = 0.4f)
+            sparkle(this, 0.3f, 10, 0.04f)
+            lowPass(9000f, 3500f, sweep = 0.8f)
+        }.finish(-2f)
+        Sfx.INTRO_SLAM -> Mix(2.0f).apply {
+            // Riser: noise sweeping up with a climbing tone…
+            noise(0f, 0.9f, 0.28f, attack = 0.75f, bp0 = 300f, bp1 = 6000f, q = 2.2f)
+            tone(0f, 0.9f, 110f, 880f, wave = Wave.SAW, amp = 0.16f, attack = 0.65f, glide = 0.9f)
+            // …the finger slams the phone at 0.9 s: an 808 boom, a crack and a clap…
+            tone(0.9f, 1.1f, 120f, 42f, amp = 1f, attack = 0.002f, decay = 0.45f, glide = 0.12f)
+            noise(0.9f, 0.08f, 0.5f, lp = 5000f, decay = 0.02f)
+            noise(0.9f, 0.18f, 0.35f, bp0 = 1500f, q = 1.4f, decay = 0.05f)
+            tapLayersAt(this, 0.9f, 1300f)
+            // …and a street-style brass stab with sparks as TAP! lights up.
+            for (n in intArrayOf(57, 64, 67, 72)) {
+                tone(0.92f, 0.9f, hz(n), wave = Wave.SAW, amp = 0.1f, attack = 0.004f, decay = 0.28f, vibratoHz = 6f, vibratoDepth = 0.006f)
+            }
+            sparkle(this, 0.95f, 14, 0.035f)
+            echo(0.18f, 0.25f, 0.25f)
+            lowPass(9000f)
+            drive(1.3f)
+        }.finish(-1f)
+    }
+
+    private fun tapLayersAt(m: Mix, start: Float, base: Float) {
+        m.tone(start, 0.075f, base * 1.6f, base * 0.8f, amp = 0.55f, attack = 0.0015f, decay = 0.028f, glide = 0.025f)
+        m.noise(start, 0.006f, 0.22f, hp = 3000f, decay = 0.002f)
     }
 
     private fun tapLayers(m: Mix, base: Float) {

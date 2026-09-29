@@ -178,7 +178,19 @@ abstract class Screen(protected val app: GameApp) {
         ui.neon.glowText(c, headerTitle, width / 2f, y, p, Palette.withAlpha(Palette.CYAN, 0.8f), 10f * u)
     }
 
+    /**
+     * Menu background: the mascot scene blurred and darkened, drifting slowly (the neon grid when
+     * the illustration isn't available).
+     */
     protected fun drawBackdrop(c: Canvas, gridAlpha: Float = 0.55f, horizon: Float = 0.7f) {
+        val art = ui.art.backdrop
+        if (art != null) {
+            val drift = if (app.settings.reduceEffects) 0f else kotlin.math.sin(ui.time * 0.15f)
+            ui.art.drawCover(c, art, width, height, zoom = 1.08f + 0.03f * drift, dx = drift * 10f * u)
+            backdropShade.color = 0x66050208
+            c.drawRect(0f, 0f, width, height, backdropShade)
+            return
+        }
         val bg = ui.background
         bg.horizon = horizon
         bg.gridAlpha = gridAlpha
@@ -187,6 +199,8 @@ abstract class Screen(protected val app: GameApp) {
         bg.speed = 1f
         bg.draw(c)
     }
+
+    private val backdropShade = android.graphics.Paint()
 
     companion object {
         private const val TOUCH_SLOP = 8f

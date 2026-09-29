@@ -1,5 +1,6 @@
 package com.dedonervoso.core.stage
 
+import com.dedonervoso.core.engine.BossKind
 import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.PenaltyTier
 import com.dedonervoso.core.engine.ZoneType
@@ -49,6 +50,37 @@ object StageCatalog {
         comboTimeoutMs = 1_500L,
         penaltyTier = PenaltyTier.MEDIUM,
         seed = Rng.mix(0x7A97A9L, 0xD0E1L),
+    )
+
+    /** Stage number of the Arena (outside the ladder). */
+    const val ARENA = -3
+
+    /** Stage number of the daily challenge. */
+    const val DAILY = -1
+
+    /**
+     * The weekly Arena: always the full 60 s (no early end, no TIME zones), no upgrades, and the
+     * same seed for everyone during an ISO week ([weekIndex], e.g. from
+     * [com.dedonervoso.core.online.OnlineService.weekIndex]), so scores compare fairly. It feeds the
+     * online rankings.
+     */
+    fun arena(weekIndex: Long): StageConfig = StageConfig(
+        number = ARENA,
+        type = StageType.SCORE,
+        target = 0,
+        scoreTarget = 0,
+        star2Score = 0,
+        star3Score = 0,
+        stop = StopConfig(4, 5, 1_000, 2_000, warningMs = 420, graceMs = 250, reflexChance = 0.2f, fakeChance = 0.2f, minGapMs = 5_000),
+        zones = ZoneConfig(
+            spawnMinMs = 2_600, spawnMaxMs = 4_000, maxConcurrent = 2, lifeMinMs = 2_600, lifeMaxMs = 4_000,
+            weights = ZoneConfig.weights(ZoneType.X2 to 10, ZoneType.X3 to 5, ZoneType.X5 to 2, ZoneType.COMBO to 3, ZoneType.CRITICAL to 2),
+            driftChance = 0.35f, orbitChance = 0.15f, shrinkChance = 0.2f, lockChance = 0.12f,
+        ),
+        frenzy = FrenzyConfig(),
+        comboTimeoutMs = 1_400L,
+        penaltyTier = PenaltyTier.MEDIUM,
+        seed = Rng.mix(0xA7E7AL, weekIndex),
     )
 
     fun isBoss(number: Int) = number > 0 && number % BOSS_EVERY == 0
@@ -173,12 +205,29 @@ object StageCatalog {
         else -> PenaltyTier.HEAVY
     }
 
+    /**
+     * SURVIVAL is a STOP gauntlet: two more STOPs than the stage would have, closer together. The
+     * objective is to get through all of them (one may be a FAKE where fakes exist).
+     */
+    private fun survivalStop(s: StopConfig): StopConfig {
+        val count = s.countMin + 2
+        return StopConfig(
+            count, count, s.durationMinMs, s.durationMaxMs, s.warningMs, s.graceMs, s.reflexChance, s.fakeChance,
+            minGapMs = max(2_500L, s.minGapMs - 1_500L), minHolds = if (s.fakeChance > 0f) count - 1 else count,
+        )
+    }
+
+    /**
+     * Builds a ladder stage. [target] is the objective (the boss's health for BOSS; ignored for
+     * SURVIVAL, whose target is its number of holds); [allowedErrors] only matters for SURVIVAL.
+     */
     private fun build(
         n: Int,
         type: StageType,
         target: Int,
         introduces: Mechanic? = null,
         seedSalt: Long = 0L,
+        allowedErrors: Int = 1,
     ): StageConfig {
         val boss = type == StageType.BOSS
         val expected = expectedScore(n)
@@ -186,23 +235,26 @@ object StageCatalog {
             StageType.SCORE, StageType.BOSS -> target
             else -> roundTo(expected * 0.7f, 10)
         }
-        // Two stars around an average run, three stars need a skilled one (≈ 0.9 × skilled mean).
+        // Score stars only grade matches that play the full time (see StageConfig.timedStars).
         val star2 = max(roundTo(expected * 1.0f, 10), if (type == StageType.SCORE || type == StageType.BOSS) roundTo(target * 1.2f, 10) else 0)
         val star3 = max(roundTo(expected * 1.35f, 10), star2 + 10)
-        val stop = stopFor(n, boss)
+        val baseStop = stopFor(n, boss)
+        val stop = if (type == StageType.SURVIVAL && baseStop != null) survivalStop(baseStop) else baseStop
         val lives = when {
-            type == StageType.SURVIVAL -> target + 1
+            type == StageType.SURVIVAL -> allowedErrors + 1
             boss -> 3
             n > 30 && stop != null -> 3
             else -> 0
         }
+        val times = StageTimes.of(n, type)
         return StageConfig(
             number = n,
             type = type,
-            target = target,
+            target = if (type == StageType.SURVIVAL) stop?.minHolds ?: 0 else target,
             scoreTarget = scoreTarget,
             star2Score = star2,
             star3Score = max(star3, star2 + 10),
+            durationMs = if (type == StageType.SURVIVAL) SURVIVAL_DURATION_MS else GameBalance.MATCH_DURATION_MS,
             lives = lives,
             stop = stop,
             zones = zonesFor(n, boss),
@@ -212,8 +264,20 @@ object StageCatalog {
             isBoss = boss,
             introduces = introduces,
             seed = Rng.mix(0x7A97A9L, n.toLong() + seedSalt),
+            endOnObjective = true,
+            star2TimeMs = times.star2Ms,
+            star3TimeMs = times.star3Ms,
+            boss = if (boss) BossKind.of(n) else null,
+            bossTier = if (boss) BossKind.tier(n) else 0,
         )
     }
+
+    /**
+     * The boss's health: points to make, sized so an average player needs about 40–45 s. Taps on
+     * the boss are worth ×3; the first boss (no zones yet) gets its own factor. Calibrated with
+     * StageTimesReport.
+     */
+    fun bossHealth(n: Int): Int = roundTo(expectedScore(n) * (if (n == BOSS_EVERY) FIRST_BOSS_HEALTH_FACTOR else BOSS_HEALTH_FACTOR), 10)
 
     private fun speedTarget(n: Int): Int {
         val share = when {
@@ -240,31 +304,31 @@ object StageCatalog {
         3 -> build(3, StageType.SCORE, scoreTarget(3), Mechanic.COINS)
         4 -> build(4, StageType.FRENZY, 1, Mechanic.FRENZY)
         5 -> build(5, StageType.SPEED, speedTarget(5))
-        6 -> build(6, StageType.SURVIVAL, 1, Mechanic.STOP)
+        6 -> build(6, StageType.SURVIVAL, 0, Mechanic.STOP, allowedErrors = 2)
         7 -> build(7, StageType.SCORE, scoreTarget(7))
         8 -> build(8, StageType.COMBO, 200)
         9 -> build(9, StageType.SPEED, speedTarget(9))
-        10 -> build(10, StageType.BOSS, roundTo(expectedScore(10) * 0.62f, 10), Mechanic.BOSS)
+        10 -> build(10, StageType.BOSS, bossHealth(10), Mechanic.BOSS)
         11 -> build(11, StageType.PRECISION, 50, Mechanic.HOT_ZONES)
         12 -> build(12, StageType.SCORE, scoreTarget(12))
         13 -> build(13, StageType.PERFECT, 15, Mechanic.PERFECT)
         14 -> build(14, StageType.COMBO, 330)
-        15 -> build(15, StageType.SURVIVAL, 1)
+        15 -> build(15, StageType.SURVIVAL, 0, allowedErrors = 2)
         16 -> build(16, StageType.SCORE, scoreTarget(16), Mechanic.REFLEX)
         17 -> build(17, StageType.SPEED, speedTarget(17), Mechanic.SPECIAL_ZONES)
         18 -> build(18, StageType.PRECISION, 70)
         19 -> build(19, StageType.FRENZY, 3)
-        20 -> build(20, StageType.BOSS, roundTo(expectedScore(20) * 0.6f, 10))
+        20 -> build(20, StageType.BOSS, bossHealth(20))
         21 -> build(21, StageType.COMBO, 350, Mechanic.MOVING_ZONES)
         22 -> build(22, StageType.SCORE, scoreTarget(22))
         23 -> build(23, StageType.PRECISION, 80, Mechanic.LOCK_ZONES)
-        24 -> build(24, StageType.SURVIVAL, 0, Mechanic.FAKE_STOP)
+        24 -> build(24, StageType.SURVIVAL, 0, Mechanic.FAKE_STOP, allowedErrors = 1)
         25 -> build(25, StageType.PERFECT, 25, Mechanic.CRITICAL_ZONES)
         26 -> build(26, StageType.SPEED, speedTarget(26))
         27 -> build(27, StageType.SCORE, scoreTarget(27))
         28 -> build(28, StageType.COMBO, 360)
         29 -> build(29, StageType.FRENZY, 4)
-        else -> build(30, StageType.BOSS, roundTo(expectedScore(30) * 0.68f, 10))
+        else -> build(30, StageType.BOSS, bossHealth(30))
     }
 
     private val PROCEDURAL_CYCLE = arrayOf(
@@ -273,7 +337,7 @@ object StageCatalog {
     )
 
     private fun procedural(n: Int): StageConfig {
-        if (isBoss(n)) return build(n, StageType.BOSS, roundTo(expectedScore(n) * 0.7f, 10))
+        if (isBoss(n)) return build(n, StageType.BOSS, bossHealth(n))
         val k = n - 30
         // Rotate objectives with a seeded offset per block so blocks don't repeat identically.
         val block = (n - 1) / BOSS_EVERY
@@ -284,15 +348,22 @@ object StageCatalog {
             StageType.SPEED -> speedTarget(n)
             StageType.COMBO -> min(600, 340 + k * 2)
             StageType.PRECISION -> min(110, 80 + k / 2)
-            StageType.SURVIVAL -> if (n % 2 == 0) 0 else 1
+            StageType.SURVIVAL -> 0
             StageType.PERFECT -> min(45, 25 + k / 3)
             StageType.FRENZY -> min(6, 4 + k / 20)
-            StageType.BOSS -> roundTo(expectedScore(n) * 0.7f, 10)
+            StageType.BOSS -> bossHealth(n)
         }
-        return build(n, type, target)
+        return build(n, type, target, allowedErrors = if (n % 2 == 0) 1 else 2)
     }
 
     fun roundTo(value: Float, step: Int): Int = max(step, (value / step).roundToInt() * step)
 
     const val HANDCRAFTED = 30
+
+    /** Boss health relative to [expectedScore] (see [bossHealth]). */
+    const val BOSS_HEALTH_FACTOR = 0.8f
+    const val FIRST_BOSS_HEALTH_FACTOR = 1.6f
+
+    /** SURVIVAL stages are shorter: their STOPs are packed into this limit. */
+    const val SURVIVAL_DURATION_MS = 48_000L
 }

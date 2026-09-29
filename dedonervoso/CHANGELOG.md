@@ -3,6 +3,54 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.3.0] — 2026-09-29 · Campanha e Arena
+
+Versão 5. O online passa a exigir esta versão: o ranking agora é da Arena e as regras do servidor
+mudaram (`minAppVersion` 5).
+
+### Fases
+- A fase termina no instante em que a missão é cumprida ("MISSÃO CUMPRIDA!", com câmera lenta e o
+  tempo na tela); os 60 s passam a ser só o limite. Falhar também encerra na hora (sem vidas).
+- Estrelas pelo tempo: tempo da partida + 2 s por STOP errado. ★★ no tempo de um jogador médio,
+  ★★★ no de um habilidoso (calibrados por simulação, `StageTimesReport`). Durante a partida,
+  embaixo do relógio, aparecem as estrelas em jogo e quanto tempo falta para perdê-las.
+- SURVIVAL virou "Sobreviva a N STOPs" (duas STOPs a mais, mais juntas, 48 s de limite) e termina
+  no último STOP; as estrelas contam os erros (sem erro ★★★, 1 erro ★★).
+- O recorde de cada fase é o melhor tempo (mostrado na tela inicial).
+- Todas as fases e a Arena usam a mesma semente para todos: mesmos STOPs e zonas em cada tentativa.
+
+### Bosses
+- Fases 10, 20, 30…: O DEDO FURIOSO, PUNHO DE FERRO, O CRONÔMETRO, GLITCH e REI NERVOSO (da 60 em
+  diante voltam mais fortes). Ilustrados, com barra de vida ilustrada e o rosto do boss.
+- A vida do boss é a meta de pontos: tocar nele vale ×3 e o centro é PERFECT; ele anda e foge do
+  dedo, ruge (o STOP) e ataca: ESCUDO, INVESTIDA, APAGÃO, -3 s no relógio e TELEPORTE, sempre
+  avisados antes. Abaixo de 50% e 20% da vida entra em FÚRIA.
+- Derrotar o boss encerra a fase com explosão e som próprios.
+
+### Arena e ranking
+- Botão ARENA na tela inicial (liberado depois do boss da fase 10): 60 s valendo pontos, sem
+  upgrades, a mesma arena para todos durante a semana ISO.
+- Os rankings Global, da Semana e de Amigos passam a contar só a Arena (`arenaBest` no perfil e
+  `arenaWeeks/{semana}/scores`). As partidas da campanha só atualizam a fase mais alta.
+- O resultado da Arena mostra a posição da semana (TOP X% ou #N de M).
+- O recorde antigo vira "Recorde clássico" no perfil; o ranking do aparelho recomeça com a Arena.
+
+### Economia
+- Moedas mais difíceis: base, desempenho, estrelas, primeira vitória, recorde, bônus de boss,
+  COIN BOOST (+6% por nível), desafio diário, missões, subida de nível e moedas das zonas
+  douradas e dos PERFECT, todos reduzidos. Repetir uma fase já vencida paga metade da base.
+- Bônus de rapidez: moedas e XP pelos segundos que sobraram.
+
+### Visual e som
+- Abertura nova com a ilustração do mascote: a cena surge do escuro, o dedo bate no celular no
+  impacto do som (clarão, tremor, faíscas) e os "CLICA! CLICA! VAI!" pulsam.
+- Tela inicial com o mascote (tocar nele solta faíscas); os menus usam a cena desfocada de fundo.
+- Ícone novo (o rosto do mascote), também na abertura do Android 12+.
+- Sons novos: rugido, golpe e ataque do boss, derrota do boss, missão cumprida e o impacto da
+  abertura.
+- Tela de resultado nova: tempo, pontos, taps, TAP/s médio e máximo, combo, precisão, reflexo,
+  moedas e XP, e o que falta para a próxima estrela.
+
 ## [1.2.0] — 2026-09-28 · Duelo ao vivo
 
 Duelos ao vivo entre amigos (versionCode 4), pelo Realtime Database do projeto

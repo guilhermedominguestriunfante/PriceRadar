@@ -4,6 +4,7 @@ import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.PenaltyTier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -59,5 +60,26 @@ class StageCatalogTest {
     fun proceduralStagesVaryObjectives() {
         val types = (31..60).map { StageCatalog.stage(it).type }.toSet()
         assertTrue(types.size >= 6, "variety: $types")
+    }
+
+    @Test
+    fun ladderStagesEndOnTheirObjectiveAndGradeByTime() {
+        for (n in 1..200) {
+            val s = StageCatalog.stage(n)
+            assertTrue(s.endOnObjective, "stage $n ends on its objective")
+            if (s.type == StageType.SURVIVAL) {
+                assertEquals(s.stop!!.minHolds, s.target, "stage $n: its STOPs are all needed")
+                assertTrue(s.lives >= 2, "stage $n allows an error")
+                assertTrue(s.durationMs < GameBalance.MATCH_DURATION_MS)
+            } else {
+                assertTrue(s.timedStars, "stage $n has star times")
+                assertTrue(s.star3TimeMs < s.star2TimeMs, "stage $n: 3 stars is faster than 2")
+                assertTrue(s.star2TimeMs <= s.durationMs, "stage $n: 2 stars within the limit")
+            }
+        }
+        val arena = StageCatalog.arena(202640)
+        assertFalse(arena.endOnObjective)
+        assertEquals(arena.seed, StageCatalog.arena(202640).seed, "same Arena all week")
+        assertTrue(arena.seed != StageCatalog.arena(202641).seed, "a new Arena every week")
     }
 }

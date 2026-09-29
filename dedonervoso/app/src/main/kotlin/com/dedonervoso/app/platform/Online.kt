@@ -3,6 +3,7 @@ package com.dedonervoso.app.platform
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import com.dedonervoso.core.online.BoardStanding
 import com.dedonervoso.core.online.FirebaseClient
 import com.dedonervoso.core.online.FirebaseConfig
 import com.dedonervoso.core.online.Http
@@ -88,13 +89,26 @@ class Online(
         }
     }
 
-    /** Publishes a finished match; a failure just waits for the next sync. */
+    /**
+     * Publishes a finished match; a failure just waits for the next sync. Arena matches reach the
+     * rankings; the others only raise the highest stage cleared. Duels are never submitted.
+     */
     fun submit(outcome: MatchOutcome) {
         if (!canTalk || outcome.result.suspicious) return
         val r = outcome.result
-        val result = OnlineResult(r.score, r.taps, r.maxTps, outcome.stage.number)
+        val stage = progression.save.highestCleared.coerceAtLeast(0)
+        val result = if (outcome.arena) OnlineResult(r.score, r.taps, r.maxTps, stage) else OnlineResult(0, 0, 0f, stage, arena = false)
         val profile = profile()
         call({ service.submit(it, profile, result) }) { _, _ -> }
+    }
+
+    /** Where an Arena [score] stands on this week's board; [done] gets null when offline. */
+    fun weekStanding(score: Long, done: (BoardStanding?) -> Unit) {
+        if (!canTalk) {
+            done(null)
+            return
+        }
+        call({ service.weekStanding(it, score) }) { standing, _ -> done(standing) }
     }
 
     fun leaderboard(board: OnlineBoard, metric: OnlineMetric, done: (List<OnlineEntry>?, OnlineFailure?) -> Unit) {
@@ -163,13 +177,15 @@ class Online(
     /** Best results already made on this device (published when online play is switched on). */
     private fun localBest(): OnlineResult? {
         val save = progression.save
+        val stage = save.highestCleared.coerceAtLeast(0)
+        // The device ranking holds Arena matches only.
         val honest = save.ranking.filter { !it.suspicious }
-        if (honest.isEmpty()) return null
+        if (honest.isEmpty()) return if (stage > 0) OnlineResult(0, 0, 0f, stage, arena = false) else null
         return OnlineResult(
             score = honest.maxOf { it.score },
             taps = honest.maxOf { it.taps },
             tps = honest.maxOf { it.maxTps },
-            stage = save.highestCleared.coerceAtLeast(0),
+            stage = stage,
         )
     }
 
