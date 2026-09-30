@@ -29,6 +29,17 @@ object Endpoints {
     /** Replaces the build's Firebase settings (tests use the local emulators). */
     @Volatile
     var firebaseOverride: com.dedonervoso.core.online.FirebaseConfig? = null
+
+    /**
+     * Opens illustrations instead of the APK's assets (tests: Robolectric on Windows lists an assets
+     * folder with "\" paths, so nothing under assets/art could be opened there).
+     */
+    @Volatile
+    var artOverride: ((String) -> java.io.InputStream?)? = null
+
+    /** An asset of the illustrations (`art/…`), through [artOverride] when set. */
+    fun openArt(assets: android.content.res.AssetManager, path: String): java.io.InputStream =
+        artOverride?.invoke(path) ?: assets.open(path)
 }
 
 /** The installed version, from the package manager (single source: app/build.gradle.kts). */

@@ -89,7 +89,9 @@ class ReleaseBuildSmokeTest {
         assertTrue("onboarding done: $json", json.contains("\"onboardingDone\":true"))
         assertTrue("stage 2 unlocked: $json", json.contains("\"highestUnlocked\":2"))
         val taps = Regex("\"totalTaps\":(\\d+)").find(json)?.groupValues?.get(1)?.toLong() ?: 0L
-        assertTrue("taps counted: $taps", taps > 300)
+        // Stage 1 asks for 150 TAPs and ends the moment they are made.
+        assertTrue("taps counted: $taps", taps >= 150)
+        assertTrue("best time recorded: $json", json.contains("\"stageBestTime\":{\"1\":"))
         val coins = Regex("\"coins\":(\\d+)").find(json)?.groupValues?.get(1)?.toLong() ?: 0L
         assertTrue("coins earned: $coins", coins > 0)
         controller.destroy()

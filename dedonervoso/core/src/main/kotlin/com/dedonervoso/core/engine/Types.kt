@@ -58,7 +58,7 @@ enum class ZoneMotion { STATIC, DRIFT, ORBIT, TELEPORT }
 
 enum class BreakReason { TIMEOUT, STOP_FAULT, ZONE_MISS, FALSE_START }
 
-enum class TapKind { NORMAL, ZONE, PERFECT }
+enum class TapKind { NORMAL, ZONE, PERFECT, BOSS }
 
 enum class IgnoreReason { NOT_PLAYING, REACTION_GRACE, RATE_LIMIT, TOO_MANY_POINTERS, BAD_TIMESTAMP }
 

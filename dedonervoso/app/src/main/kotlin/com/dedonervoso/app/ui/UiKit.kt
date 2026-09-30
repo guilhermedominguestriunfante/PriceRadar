@@ -48,6 +48,12 @@ class UiKit(context: Context) {
     /** Wordmark and glove-hand mark (Home logo, opening). */
     val brand = Brand(this)
 
+    /** Mascot illustration and the menus' blurred backdrop. */
+    val art = Art(context.assets)
+
+    /** The five bosses. */
+    val bossArt = BossArt(this, context.assets)
+
     var time = 0f
         private set
 

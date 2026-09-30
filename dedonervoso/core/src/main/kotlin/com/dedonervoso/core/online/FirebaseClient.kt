@@ -170,6 +170,31 @@ class FirebaseClient(val config: FirebaseConfig, private val http: Http, private
         }
     }
 
+    /** How many documents of [collection] (under [parent], "" for the root) have [field] greater than [value]. */
+    fun count(session: AuthSession, parent: String, collection: String, field: String, value: Long): Long {
+        val query = mapOf(
+            "structuredAggregationQuery" to mapOf(
+                "structuredQuery" to mapOf(
+                    "from" to listOf(mapOf("collectionId" to collection)),
+                    "where" to mapOf(
+                        "fieldFilter" to mapOf(
+                            "field" to mapOf("fieldPath" to field), "op" to "GREATER_THAN",
+                            "value" to FirestoreValues.encode(value),
+                        ),
+                    ),
+                ),
+                "aggregations" to listOf(mapOf("alias" to "n", "count" to emptyMap<String, Any>())),
+            ),
+        )
+        val base = if (parent.isEmpty()) config.documentsRoot else "${config.documentsRoot}/${encodePath(parent)}"
+        val r = authorized(session) { http.request("POST", "${config.firestoreBase}/$base:runAggregationQuery", Json.write(query), it) }
+        for (item in parseArray(r, "runAggregationQuery")) {
+            val fields = ((item as? Map<*, *>)?.get("result") as? Map<*, *>)?.get("aggregateFields") as? Map<*, *> ?: continue
+            return (FirestoreValues.decode(fields["n"]) as? Number)?.toLong() ?: 0L
+        }
+        return 0L
+    }
+
     /** Applies [writes] atomically: all succeed or none does (e.g. a rule or precondition fails). */
     fun commit(session: AuthSession, writes: List<FsWrite>) {
         val body = Json.write(mapOf("writes" to writes.map { encodeWrite(it) }))

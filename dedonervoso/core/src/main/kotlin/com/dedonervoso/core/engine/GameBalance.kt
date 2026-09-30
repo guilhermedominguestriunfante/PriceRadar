@@ -42,7 +42,7 @@ object GameBalance {
     const val PERFECT_RADIUS_PER_CRIT_LEVEL = 0.03f
     const val PERFECT_BONUS_TAPS = 2
     const val PERFECT_BONUS_PER_CRIT_LEVEL = 0.15f
-    const val PERFECTS_PER_COIN = 4
+    const val PERFECTS_PER_COIN = 6
     const val ZONE_MULT_PER_BOOST_LEVEL = 0.10f
     const val ZONE_RADIUS_PER_BOOST_LEVEL = 0.04f
     const val ZONE_EXPIRE_GRACE_MS = 120L
@@ -51,8 +51,8 @@ object GameBalance {
     const val ZONE_GOLDEN_RADIUS = 0.085f
     /** Zones spawn outside this disc around the arena centre, where the HUD core shows the combo (moving zones may still cross it). */
     const val CORE_CLEAR_RADIUS = 0.15f
-    const val GOLDEN_COINS_MIN = 25
-    const val GOLDEN_COINS_MAX = 60
+    const val GOLDEN_COINS_MIN = 10
+    const val GOLDEN_COINS_MAX = 25
     const val GOLDEN_LIFETIME_MS = 2_200L
     const val TELEPORT_PERIOD_MS = 1_300L
 
@@ -65,7 +65,7 @@ object GameBalance {
     const val MEGA_FRENZY_DURATION_MS = 6_500L
     const val MEGA_FRENZY_MULTIPLIER = 4f
     const val MEGA_FRENZY_CHANCE = 0.03f
-    const val MEGA_FRENZY_TAPS_PER_COIN = 4
+    const val MEGA_FRENZY_TAPS_PER_COIN = 8
     const val FRENZY_FILL_TAP = 0.0055f
     const val FRENZY_FILL_ZONE = 0.012f
     const val FRENZY_FILL_PERFECT = 0.035f
@@ -97,6 +97,35 @@ object GameBalance {
     // ---- Combo timer -------------------------------------------------------------------------
     const val COMBO_TIMEOUT_EASY_MS = 2_000L
     const val COMBO_TIMEOUT_HARD_MS = 900L
+
+    // ---- Stage grading (stages end as soon as their objective is met) ----------------------------
+    /** Each STOP error adds this much to the time that grades the stage. */
+    const val STOP_ERROR_TIME_PENALTY_MS = 2_000L
+
+    // ---- Bosses ------------------------------------------------------------------------------------
+    const val BOSS_RADIUS = 0.16f
+    const val BOSS_HIT_TOLERANCE = 1.1f
+    /** Taps this close to the boss's centre (fraction of its radius) are PERFECT. */
+    const val BOSS_PERFECT_FRACTION = 0.3f
+    /** Points multiplier of a tap on the boss. */
+    const val BOSS_HIT_MULT = 3f
+    /** Arena widths per second while wandering. */
+    const val BOSS_SPEED = 0.2f
+    const val BOSS_CHARGE_SPEED = 3.2f
+    const val BOSS_RETARGET_MIN_MS = 900L
+    const val BOSS_RETARGET_MAX_MS = 1_800L
+    const val BOSS_FLEE_COOLDOWN_MS = 900L
+    const val BOSS_FIRST_ATTACK_MS = 7_000L
+    const val BOSS_ATTACK_GAP_MIN_MS = 7_000L
+    const val BOSS_ATTACK_GAP_MAX_MS = 10_000L
+    const val BOSS_ATTACK_WARNING_MS = 700L
+    /** Health fractions where the boss gets angrier (faster, attacks more often). */
+    const val BOSS_RAGE_1 = 0.5f
+    const val BOSS_RAGE_2 = 0.2f
+    const val BOSS_CLOCK_MS = 3_000L
+    /** A CLOCK attack never leaves less than this to play. */
+    const val BOSS_CLOCK_MIN_LEFT_MS = 5_000L
+    const val BOSS_TELEPORTS = 3
 
     // ---- Live duels -----------------------------------------------------------------------------
     /** Orbs start falling at these match times… */

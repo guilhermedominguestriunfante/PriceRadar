@@ -10,6 +10,8 @@ import com.dedonervoso.app.GameApp
 import com.dedonervoso.app.platform.Duel
 import com.dedonervoso.core.audio.MusicMode
 import com.dedonervoso.core.audio.Sfx
+import com.dedonervoso.core.engine.Boss
+import com.dedonervoso.core.engine.BossAttack
 import com.dedonervoso.core.engine.BreakReason
 import com.dedonervoso.core.engine.DuelItem
 import com.dedonervoso.core.engine.DuelOrb
@@ -32,6 +34,7 @@ import com.dedonervoso.core.stage.Mechanic
 import com.dedonervoso.core.stage.StageCatalog
 import com.dedonervoso.core.stage.StageConfig
 import com.dedonervoso.core.util.Ease
+import com.dedonervoso.app.ui.BossArt
 import com.dedonervoso.app.ui.Button
 import com.dedonervoso.app.ui.Dialog
 import com.dedonervoso.app.ui.DuelArt
@@ -81,7 +84,22 @@ class PlayScreen(
     private var result: MatchResult? = null
     private var endAge = 0f
     private var introMechanic: Mechanic? = null
-    private val seed = duel?.seed ?: (SystemClock.uptimeMillis() xor stage.seed)
+    /** Every player gets the same stage (and the same weekly Arena): fair times and records. */
+    private val seed = duel?.seed ?: stage.seed
+    private val arenaMode = stage.number == StageCatalog.ARENA
+
+    // ---- boss & stage grading presentation
+    private val bossLook = BossArt.Look()
+    private var bossName = ""
+    private val bossBarRect = RectF()
+    private val trailX = FloatArray(TRAIL)
+    private val trailY = FloatArray(TRAIL)
+    private var trailCount = 0
+    private var blackout = 0f
+    private var endTimeLabel = ""
+    private val starTimeText = NumText { "${app.strings.dec1(it / 10f)} s" }
+    private val starLabels = arrayOf("★", "★★", "★★★")
+    private var weekBestLabel = ""
 
     // ---- layout
     private val arena = RectF()
@@ -163,10 +181,18 @@ class PlayScreen(
         ui.rings.clear()
         stageLabel = when {
             duel != null -> s.duel
+            arenaMode -> s.arena
             daily -> dailyTitle ?: s.daily
+            stage.isBoss -> "${s.stage} ${stage.number} · ${s.boss}"
             else -> "${s.stage} ${stage.number}"
         }
         targetText = "/ " + s.num(if (stage.type == com.dedonervoso.core.stage.StageType.BOSS) stage.scoreTarget.toLong() else stage.target.toLong())
+        stage.boss?.let { bossName = s.bossName(it) }
+        if (arenaMode) {
+            val best = app.progression.save.let { if (it.arenaWeekId == com.dedonervoso.core.online.OnlineService.isoWeek(System.currentTimeMillis())) it.arenaWeekBest else 0L }
+            weekBestLabel = if (best > 0) "${s.bestLabel} ${s.num(best)}" else s.arenaWeek
+        }
+        bossLook.reduce = reduce
         if (duel != null) duelTexts()
         val m = stage.introduces
         introMechanic = if (!daily && duel == null && m != null && m !in app.progression.save.seenIntros) m else null
@@ -210,7 +236,15 @@ class PlayScreen(
             arena.set(safe.left, top + 104f * u, safe.right, itemRect.top - 8f * u)
         } else {
             bottomY = safe.bottom - 20f * u
-            arena.set(safe.left, top + 104f * u, safe.right, safe.bottom - 48f * u)
+            // Boss stages: the boss's health bar sits between the HUD and the arena.
+            var arenaTop = top + 104f * u
+            if (stage.boss != null) {
+                val barW = min(safe.width() - 12f * u, 360f * u)
+                val barH = barW / ui.bossArt.barAspect
+                bossBarRect.set(width / 2f - barW / 2f, top + 92f * u, width / 2f + barW / 2f, top + 92f * u + barH)
+                arenaTop = bossBarRect.bottom - 2f * u
+            }
+            arena.set(safe.left, arenaTop, safe.right, safe.bottom - 48f * u)
         }
         frenzyBarRect.set(side, bottomY - 5f * u, right, bottomY + 5f * u)
         coreX = arena.centerX()
@@ -220,7 +254,8 @@ class PlayScreen(
             session = if (duel != null) {
                 GameSession(stage, Loadout.NONE, arena.height() / arena.width(), seed, this, duel = true).also { duel.attach(it) }
             } else {
-                GameSession(stage, app.progression.loadout, arena.height() / arena.width(), seed, this)
+                // The Arena is played without upgrades, so its scores compare fairly.
+                GameSession(stage, if (arenaMode) Loadout.NONE else app.progression.loadout, arena.height() / arena.width(), seed, this)
             }
         }
         // Pause overlay buttons.
@@ -301,7 +336,13 @@ class PlayScreen(
 
     private fun restart() {
         session?.abort(SystemClock.uptimeMillis())
-        app.host.replace(if (daily) daily(app) else forStage(app, stage.number))
+        app.host.replace(
+            when {
+                arenaMode -> arena(app)
+                daily -> daily(app)
+                else -> forStage(app, stage.number)
+            },
+        )
     }
 
     private fun quit() {
@@ -394,8 +435,11 @@ class PlayScreen(
         val sess = session
         if (duel != null) duel.drive(now) else if (sess != null && phase == Phase.PLAY) sess.update(now)
         val st = sess?.state
-        val fxScale = if (st == GameState.STOP) 0.15f else 1f
+        // A moment of slow motion when a mission is completed.
+        val slowMo = phase == Phase.ENDING && age - endAge < 0.9f && endTimeLabel.isNotEmpty()
+        val fxScale = if (st == GameState.STOP) 0.15f else if (slowMo) 0.35f else 1f
         ui.particles.update(dt * fxScale)
+        sess?.boss?.let { updateBossLook(it, sess, dt) }
         ui.rings.update(dt)
         ui.popups.update(dt)
         shake.update(dt)
@@ -427,6 +471,30 @@ class PlayScreen(
             }
         }
         if (phase == Phase.ENDING && age - endAge > END_DELAY_S) finishToResults()
+    }
+
+    private fun updateBossLook(b: Boss, sess: GameSession, dt: Float) {
+        val look = bossLook
+        look.time = ui.time
+        look.hit = max(0f, look.hit - dt * 6f)
+        look.rage = b.rage
+        look.shield = b.shielded
+        look.charging = b.charging
+        look.warning = b.warning
+        // It roars through a STOP's warning and hold.
+        val roaring = sess.warningActive || sess.state == GameState.STOP
+        look.roar += ((if (roaring) 1f else 0f) - look.roar) * min(1f, dt * 10f)
+        blackout = if (b.blackout) min(1f, blackout + dt * 5f) else max(0f, blackout - dt * 3f)
+        // Afterimages while charging.
+        if (b.charging && !reduce) {
+            System.arraycopy(trailX, 0, trailX, 1, TRAIL - 1)
+            System.arraycopy(trailY, 0, trailY, 1, TRAIL - 1)
+            trailX[0] = toScreenX(b.x)
+            trailY[0] = toScreenY(b.y)
+            trailCount = min(TRAIL, trailCount + 1)
+        } else {
+            trailCount = max(0, trailCount - 1)
+        }
     }
 
     private fun updateBackground(sess: GameSession, dt: Float) {
@@ -487,6 +555,7 @@ class PlayScreen(
     override fun onCountdown(value: Int, resuming: Boolean) {
         countdownValue = value
         countdownAge = 0f
+        if (value == 3 && !resuming && stage.boss != null) app.sfx.play(Sfx.BOSS_ROAR)
         if (value > 0) {
             app.sfx.play(Sfx.COUNT_BEEP, 0.9f, 1f + (3 - value) * 0.06f)
         } else {
@@ -506,6 +575,8 @@ class PlayScreen(
             TapKind.PERFECT -> {
                 sprite = Palette.S_GOLD
                 color = Palette.GOLD
+                // A perfect without a zone is the boss's bullseye.
+                if (zone == null && session?.boss != null) bossLook.hit = 1f
                 app.sfx.play(Sfx.PERFECT, 0.85f, 1f + comboTier * 0.02f)
                 app.haptics.perfect()
                 ui.popups.addMerged(POPUP_PERFECT, 1, perfectLabel, px, py - 46f * u, Palette.GOLD, 17f, 0.7f, 50f, 0)
@@ -517,6 +588,14 @@ class PlayScreen(
                 color = Visuals.zoneColor(zone.type)
                 app.sfx.play(Sfx.TAP_ZONE, 0.6f, 0.97f + comboTier * 0.03f)
                 app.haptics.tap()
+            }
+            TapKind.BOSS -> {
+                sprite = Palette.S_ORANGE
+                color = Palette.ORANGE
+                app.sfx.play(Sfx.BOSS_HIT, 0.7f, 0.95f + comboTier * 0.03f + touchJitter() * 0.06f)
+                app.haptics.tap()
+                bossLook.hit = 1f
+                shake.add(0.04f)
             }
             TapKind.NORMAL -> {
                 sprite = if (session?.state == GameState.FRENZY) Palette.S_MAGENTA + (points and 3) else Palette.S_CYAN
@@ -601,6 +680,62 @@ class PlayScreen(
 
     override fun onInterruptWarning(kind: InterruptKind) {
         app.sfx.play(Sfx.STOP_WARN, 0.9f)
+        // In a boss fight the STOP is the boss roaring.
+        if (stage.boss != null) app.sfx.play(Sfx.BOSS_ROAR, 0.75f)
+    }
+
+    // ---- boss --------------------------------------------------------------------------------------
+
+    private fun bossX(): Float = session?.boss?.let { toScreenX(it.x) } ?: coreX
+    private fun bossY(): Float = session?.boss?.let { toScreenY(it.y) } ?: coreY
+
+    override fun onBossWarning(attack: BossAttack) {
+        app.sfx.play(Sfx.BOSS_ATTACK, 0.8f)
+        banner(s.bossAttack(attack), ui.bossArt.attackColor(attack), 1f, big = false)
+    }
+
+    override fun onBossAttack(attack: BossAttack) {
+        val color = ui.bossArt.attackColor(attack)
+        when (attack) {
+            BossAttack.SHIELD -> {
+                app.sfx.play(Sfx.SHIELD, 1f, 0.8f)
+                ui.rings.add(bossX(), bossY(), 20f, 120f, color, 0.5f, 5f)
+            }
+            BossAttack.CHARGE -> {
+                app.sfx.play(Sfx.FRENZY_END, 1f, 0.6f)
+                shake.add(0.3f)
+            }
+            BossAttack.BLACKOUT -> app.sfx.play(Sfx.STOP, 0.6f, 0.7f)
+            BossAttack.CLOCK -> {
+                app.sfx.play(Sfx.TIME_BONUS, 1f, 0.6f)
+                timerPulse = 1f
+                flash(Palette.GOLD, 0.35f)
+                ui.popups.add("-${GameBalance.BOSS_CLOCK_MS / 1000}s", timerX, timerY + timerR + 20f * u, Palette.GOLD, 22f, 1.1f, 30f, 0)
+            }
+            BossAttack.TELEPORT -> Unit
+        }
+    }
+
+    override fun onBossTeleport() {
+        app.sfx.play(Sfx.ZONE_POP, 0.9f, 0.6f)
+        val x = bossX()
+        val y = bossY()
+        ui.rings.add(x, y, 10f, 110f, Palette.MAGENTA, 0.4f, 4f)
+        ui.particles.burst(x, y, 24, Palette.S_CYAN, 120f, 420f, 3f, 7f, 0.4f, Particles.SPARK)
+    }
+
+    override fun onBossRage(rage: Int) {
+        app.sfx.play(Sfx.BOSS_ROAR, 1f, if (rage >= 2) 0.85f else 1f)
+        app.haptics.stop()
+        banner(s.bossRage(rage), Palette.RED, 1.3f)
+        flash(Palette.RED, 0.4f)
+        shake.add(0.45f)
+        ui.particles.burst(bossX(), bossY(), 40, Palette.S_RED, 150f, 500f, 3f, 8f, 0.7f, Particles.SPARK)
+    }
+
+    override fun onBossBlocked(x: Float, y: Float) {
+        app.sfx.play(Sfx.SHIELD, 0.5f, 1.4f)
+        ui.popups.add(s.bossBlocked, toScreenX(x), toScreenY(y) - 20f * u, Palette.CYAN, 15f, 0.6f, 40f, 1)
     }
 
     override fun onInterruptStart(kind: InterruptKind) {
@@ -733,6 +868,8 @@ class PlayScreen(
     }
 
     override fun onObjectiveComplete() {
+        // A stage that ends on its objective is presented by onFinished, which follows at once.
+        if (stage.endOnObjective) return
         app.sfx.play(Sfx.STAR_2, 0.9f)
         banner(s.objectiveDone, Palette.GREEN, 1.4f, big = false)
         ui.rings.add(progressRect.centerX(), progressRect.centerY(), 10f, 90f, Palette.GREEN, 0.6f, 4f)
@@ -812,10 +949,34 @@ class PlayScreen(
             }
             return
         }
-        if (result.won) {
+        if (result.won && result.isBoss) {
+            // The boss explodes.
+            app.sfx.play(Sfx.BOSS_DEFEAT)
+            app.haptics.celebrate()
+            banner(s.bossDefeated, Palette.GOLD, END_DELAY_S)
+            endTimeLabel = s.seconds(result.playedMs)
+            val x = bossX()
+            val y = bossY()
+            flash(Palette.WHITE, 0.7f)
+            shake.add(0.8f)
+            ui.rings.add(x, y, 20f, 260f, Palette.GOLD, 0.8f, 7f)
+            ui.rings.add(x, y, 10f, 180f, Palette.RED, 0.6f, 5f)
+            ui.particles.burst(x, y, 40, Palette.S_GOLD, 200f, 900f, 3f, 10f, 1f, Particles.SPARK)
+            ui.particles.burst(x, y, 40, Palette.S_ORANGE, 200f, 900f, 3f, 10f, 1f, Particles.SPARK)
+            ui.particles.burst(x, y, 40, Palette.S_RED, 200f, 900f, 3f, 10f, 1f, Particles.SPARK)
+            ui.particles.confetti(width, 0f, 120)
+        } else if (result.won && result.endedEarly) {
+            // Mission complete: the time it took, in slow motion.
+            app.sfx.play(Sfx.MISSION)
+            app.haptics.celebrate()
+            banner(s.missionComplete, Palette.GREEN, END_DELAY_S)
+            endTimeLabel = s.seconds(result.playedMs)
+            ui.rings.add(coreX, coreY, 20f, 220f, Palette.GREEN, 0.7f, 5f)
+            ui.particles.confetti(width, 0f, 90)
+        } else if (result.won) {
             app.sfx.play(Sfx.WIN)
             app.haptics.celebrate()
-            banner(s.stageClear, Palette.GREEN, END_DELAY_S)
+            banner(if (arenaMode) s.timeUp else s.stageClear, if (arenaMode) Palette.GOLD else Palette.GREEN, END_DELAY_S)
             ui.particles.confetti(width, 0f, 90)
         } else {
             app.sfx.play(Sfx.LOSE)
@@ -837,10 +998,12 @@ class PlayScreen(
         c.translate(shake.offsetX, shake.offsetY)
         if (sess != null) {
             drawArenaFrame(c, sess)
-            drawCore(c, sess)
+            // In a boss fight the combo moves to the bottom bar: the boss roams the centre.
+            if (sess.boss == null) drawCore(c, sess)
             drawZones(c, sess)
             if (sess.lockActive) drawLock(c, sess)
             if (duel != null) drawOrb(c, sess)
+            sess.boss?.let { drawBoss(c, it) }
         }
         ui.rings.draw(c)
         ui.particles.draw(c)
@@ -982,6 +1145,27 @@ class PlayScreen(
         }
     }
 
+    /** The boss (its afterimages while charging); in a blackout the arena goes dark but its eyes. */
+    private fun drawBoss(c: Canvas, b: Boss) {
+        val kind = stage.boss ?: return
+        val art = ui.bossArt
+        val r = b.radius * arena.width()
+        val x = toScreenX(b.x)
+        val y = toScreenY(b.y)
+        for (i in trailCount - 1 downTo 1) {
+            ui.neon.glowBlob(c, trailX[i], trailY[i], r * (1.4f - i * 0.1f), art.color(kind), 0.25f * (1f - i / TRAIL.toFloat()))
+        }
+        bossLook.eyesOnly = false
+        art.draw(c, kind, stage.bossTier, x, y, r, bossLook)
+        if (blackout > 0f) {
+            overlayPaint.color = Palette.withAlpha(0xFF020104.toInt(), 0.92f * blackout)
+            c.drawRect(arena, overlayPaint)
+            bossLook.eyesOnly = true
+            art.draw(c, kind, stage.bossTier, x, y, r, bossLook)
+            bossLook.eyesOnly = false
+        }
+    }
+
     private fun drawLock(c: Canvas, sess: GameSession) {
         val t = sess.activeTimeMs
         lockPath.reset()
@@ -1000,6 +1184,13 @@ class PlayScreen(
     private fun drawHud(c: Canvas, sess: GameSession) {
         if (duel != null) drawRivalPanel(c, sess, duel) else drawObjective(c, sess)
         drawTimerScoreAndButton(c, sess)
+        drawStarPace(c, sess)
+        val b = sess.boss
+        val kind = stage.boss
+        if (b != null && kind != null) {
+            val barShake = if (reduce) 0f else bossLook.hit * 3f * u * sin(ui.time * 90f)
+            ui.bossArt.healthBar(c, bossBarRect, sess.bossHealthFraction, bossName, kind, b.rage, barShake)
+        }
         if (duel != null) {
             if (sess.slowActive) {
                 val lbl = ui.style(ui.textPaint, 11f, Palette.DIM, Paint.Align.LEFT)
@@ -1010,6 +1201,66 @@ class PlayScreen(
             return
         }
         drawBottomBar(c, sess)
+        if (b != null) drawCompactCombo(c, sess)
+    }
+
+    /**
+     * Under the timer, the stars this run is on course for and how long they last:
+     * ★★★ 12.4 s. SURVIVAL shows its stars left (each STOP error costs one).
+     */
+    private fun drawStarPace(c: Canvas, sess: GameSession) {
+        if (!stage.endOnObjective || !sess.state.isActive) return
+        val stars: Int
+        var leftMs = -1L
+        if (stage.type == com.dedonervoso.core.stage.StageType.SURVIVAL) {
+            stars = (3 - sess.stopErrors).coerceIn(1, 3)
+        } else if (stage.timedStars) {
+            val graded = sess.matchTimeMs + GameBalance.STOP_ERROR_TIME_PENALTY_MS * sess.stopErrors
+            when {
+                graded <= stage.star3TimeMs -> {
+                    stars = 3
+                    leftMs = stage.star3TimeMs - graded
+                }
+                graded <= stage.star2TimeMs -> {
+                    stars = 2
+                    leftMs = stage.star2TimeMs - graded
+                }
+                else -> stars = 1
+            }
+        } else {
+            return
+        }
+        val y = timerY + timerR + 13f * u
+        val size = 11f * u
+        val text = if (leftMs >= 0) starTimeText.of(((leftMs + 99) / 100).toInt()) else ""
+        val p = ui.style(ui.displayBoldPaint, 11f, Palette.GOLD, Paint.Align.LEFT)
+        val w = 3 * size + (if (text.isEmpty()) 0f else 4f * u + p.measureText(text))
+        var x = timerX - w / 2f + size / 2f
+        for (i in 0 until 3) {
+            ui.icons.draw(c, if (i < stars) Icon.STAR else Icon.STAR_OUTLINE, x, y, size, if (i < stars) Palette.GOLD else Palette.MUTED)
+            x += size
+        }
+        if (text.isNotEmpty()) c.drawText(text, x - size / 2f + 4f * u, y + p.textSize * 0.36f, p)
+    }
+
+    /** Boss fights: the combo and the frenzy meter live at the bottom (the boss roams the centre). */
+    private fun drawCompactCombo(c: Canvas, sess: GameSession) {
+        val by = bottomY - 18f * u
+        if (sess.combo > 0) {
+            val frenzy = sess.state == GameState.FRENZY
+            val mult = sess.comboMultiplier * (if (frenzy) sess.frenzyMultiplier else 1f)
+            val lp = ui.style(ui.textPaint, 11f, Palette.DIM, Paint.Align.RIGHT)
+            c.drawText("COMBO", width / 2f - 4f * u, by + 4f * u, lp)
+            val np = ui.style(ui.displayPaint, 18f, Palette.WHITE, Paint.Align.LEFT)
+            val combo = comboText.of(sess.combo)
+            c.drawText(combo, width / 2f + 2f * u, by + 7f * u, np)
+            val mp = ui.style(ui.displayBoldPaint, 12f, if (sess.comboTier > 0) Palette.MAGENTA else Palette.DIM, Paint.Align.LEFT)
+            c.drawText(multText.of((mult * 10 + 0.5f).toInt()), width / 2f + 8f * u + np.measureText(combo), by + 6f * u, mp)
+        }
+        if (stage.hasFrenzy && sess.state != GameState.FRENZY) {
+            val full = sess.frenzyMeter >= 1f
+            ui.neon.bar(c, frenzyBarRect, sess.frenzyMeter, if (full) Palette.GOLD else Palette.PURPLE, if (full) Palette.ORANGE else Palette.MAGENTA)
+        }
     }
 
     private fun drawObjective(c: Canvas, sess: GameSession) {
@@ -1017,21 +1268,36 @@ class PlayScreen(
         // Stage label + objective progress.
         val lp = ui.style(ui.textPaint, 14f, Visuals.typeColor(stage.type), Paint.Align.LEFT)
         ui.fitText(c, stageLabel, progressRect.left, safe.top + 18f * u, lp, progressRect.width())
+        if (arenaMode) {
+            // The Arena has no objective: this week's best is the mark to beat.
+            val best = app.progression.save.arenaWeekBest
+            neon.bar(c, progressRect, if (best <= 0L) 0f else sess.score.toFloat() / best, Palette.GOLD, Palette.ORANGE)
+            val pp = ui.style(ui.mediumPaint, 12f, if (best > 0L && sess.score > best) Palette.GOLD else Palette.DIM, Paint.Align.LEFT)
+            ui.fitText(c, weekBestLabel, progressRect.left, progressRect.bottom + 16f * u, pp, progressRect.width())
+            return
+        }
         val target = sess.objectiveTarget
         val progress = sess.objectiveProgress
-        val frac = when (stage.type) {
-            com.dedonervoso.core.stage.StageType.SURVIVAL ->
-                if (sess.lives > 0 || stage.lives == 0) 1f - progress.toFloat() / (stage.target + 1) else 0f
-            else -> if (target <= 0) 1f else progress.toFloat() / target
-        }
+        val frac = if (target <= 0) 1f else progress.toFloat() / target
         val done = sess.objectiveMet
         neon.bar(c, progressRect, frac, if (done) Palette.GREEN else Visuals.typeColor(stage.type), if (done) Palette.CYAN else Palette.PURPLE)
         val pp = ui.style(ui.mediumPaint, 12f, if (done) Palette.GREEN else Palette.DIM, Paint.Align.LEFT)
-        if (stage.type != com.dedonervoso.core.stage.StageType.SURVIVAL) {
-            c.drawText(progressText.of(progress), progressRect.left, progressRect.bottom + 16f * u, pp)
-            val w = pp.measureText(progressText.of(progress))
-            c.drawText(targetText, progressRect.left + w + 4f * u, progressRect.bottom + 16f * u, pp)
+        c.drawText(progressText.of(progress), progressRect.left, progressRect.bottom + 16f * u, pp)
+        val w = pp.measureText(progressText.of(progress))
+        // SURVIVAL's target can be below the stage's when fewer STOPs were planned.
+        val tail = if (stage.type == com.dedonervoso.core.stage.StageType.SURVIVAL) survivalTargetText(target) else targetText
+        c.drawText(tail, progressRect.left + w + 4f * u, progressRect.bottom + 16f * u, pp)
+    }
+
+    private var survivalTarget = -1L
+    private var survivalText = ""
+
+    private fun survivalTargetText(target: Long): String {
+        if (target != survivalTarget) {
+            survivalTarget = target
+            survivalText = "/ $target STOP"
         }
+        return survivalText
     }
 
     private fun drawTimerScoreAndButton(c: Canvas, sess: GameSession) {
@@ -1273,6 +1539,12 @@ class PlayScreen(
         ui.fitSize(p, bannerText, width - 40f * u)
         val y = if (bannerBig) arena.top + arena.height() * 0.22f else arena.top + 44f * u
         ui.neon.glowText(c, bannerText, width / 2f, y, p, Palette.withAlpha(bannerColor, fade), 16f * u)
+        // A mission completed early shows how long it took.
+        if (phase == Phase.ENDING && endTimeLabel.isNotEmpty()) {
+            val tp = ui.style(ui.displayPaint, 40f, Palette.withAlpha(Palette.WHITE, fade), Paint.Align.CENTER)
+            tp.textSize *= 0.6f + 0.4f * Ease.outBack(((bannerAge - 0.15f) / 0.3f).coerceIn(0f, 1f))
+            ui.neon.glowText(c, endTimeLabel, width / 2f, y + 60f * u, tp, Palette.withAlpha(Palette.GOLD, fade), 14f * u)
+        }
     }
 
     private fun drawCountdown(c: Canvas, sess: GameSession) {
@@ -1295,6 +1567,15 @@ class PlayScreen(
         if (sess.resuming) {
             val rp = ui.style(ui.textPaint, 16f, Palette.DIM, Paint.Align.CENTER)
             c.drawText(s.resume, arena.centerX(), arena.top + 40f * u, rp)
+        } else if (stage.boss != null) {
+            // The boss is announced over the countdown.
+            val wp = ui.style(ui.displayBoldPaint, 14f, Palette.RED, Paint.Align.CENTER)
+            wp.letterSpacing = 0.25f
+            c.drawText(s.bossIncoming, arena.centerX(), arena.top + 30f * u, wp)
+            wp.letterSpacing = 0f
+            val np = ui.style(ui.displayPaint, 26f, Palette.WHITE, Paint.Align.CENTER)
+            ui.fitSize(np, bossName, arena.width() - 40f * u)
+            ui.neon.glowText(c, bossName, arena.centerX(), arena.top + 64f * u, np, Palette.RED, 14f * u)
         } else {
             val lp = ui.style(ui.displayBoldPaint, 18f, Visuals.typeColor(stage.type), Paint.Align.CENTER)
             c.drawText(stageLabel, arena.centerX(), arena.top + 44f * u, lp)
@@ -1404,7 +1685,11 @@ class PlayScreen(
         /** The live duel [match], once its start time is set. */
         fun duel(app: GameApp, match: Duel.Match) = PlayScreen(app, StageCatalog.duel(), duel = match)
 
+        /** This week's Arena. */
+        fun arena(app: GameApp) = PlayScreen(app, app.progression.arena())
+
         private const val END_DELAY_S = 1.6f
+        private const val TRAIL = 6
         /** Radius of a duel's falling orb (layout units). */
         private const val ORB_R = 30f
         private const val POPUP_PERFECT = 1

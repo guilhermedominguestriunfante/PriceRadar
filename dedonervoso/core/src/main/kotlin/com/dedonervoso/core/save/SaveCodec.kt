@@ -28,6 +28,7 @@ object SaveCodec {
             "selectedStage" to d.selectedStage,
             "stageStars" to d.stageStars.entries.sortedBy { it.key }.associate { it.key.toString() to it.value },
             "stageBest" to d.stageBest.entries.sortedBy { it.key }.associate { it.key.toString() to it.value },
+            "stageBestTime" to d.stageBestTime.entries.sortedBy { it.key }.associate { it.key.toString() to it.value },
             "stageFailStreak" to d.stageFailStreak.entries.filter { it.value > 0 }.associate { it.key.toString() to it.value },
             "upgrades" to d.upgrades.entries.associate { it.key.name to it.value },
             "stats" to encodeStats(d.stats),
@@ -41,12 +42,15 @@ object SaveCodec {
             "missionCounter" to d.missionCounter,
             "dailyLastDay" to d.dailyLastDay,
             "dailyStreak" to d.dailyStreak,
-            "ranking" to d.ranking.map {
+            // Arena results only; the pre-1.3 "ranking" (campaign matches) is dropped on load.
+            "arenaRanking" to d.ranking.map {
                 mapOf(
                     "score" to it.score, "stage" to it.stage, "combo" to it.maxCombo, "tps" to it.maxTps.toDouble(),
                     "taps" to it.taps, "ts" to it.timestamp, "day" to it.dayIndex, "daily" to it.daily, "sus" to it.suspicious,
                 )
             },
+            "arenaWeekId" to d.arenaWeekId,
+            "arenaWeekBest" to d.arenaWeekBest,
             "settings" to mapOf(
                 "music" to d.settings.music, "sfx" to d.settings.sfx, "vibration" to d.settings.vibration,
                 "reduceEffects" to d.settings.reduceEffects, "showFps" to d.settings.showFps, "language" to d.settings.language,
@@ -58,7 +62,9 @@ object SaveCodec {
                 linkedMapOf(
                     "enabled" to d.onlineEnabled, "uid" to it.uid, "token" to it.refreshToken, "code" to it.code,
                     "friends" to it.friends, "bestScore" to it.bestScore, "bestTaps" to it.bestTaps, "bestTps10" to it.bestTps10,
-                    "bestStage" to it.bestStage, "weekId" to it.weekId, "weekBest" to it.weekBest, "dirty" to it.dirty,
+                    "bestStage" to it.bestStage, "arenaBest" to it.arenaBest, "arenaTaps" to it.arenaTaps,
+                    "arenaTps10" to it.arenaTps10, "arenaWeekId" to it.arenaWeekId, "arenaWeekBest" to it.arenaWeekBest,
+                    "dirty" to it.dirty,
                 )
             },
         ),
@@ -66,7 +72,7 @@ object SaveCodec {
 
     private fun encodeStats(s: Stats) = linkedMapOf(
         "totalTaps" to s.totalTaps, "totalTouches" to s.totalTouches, "matches" to s.matches, "wins" to s.wins,
-        "bestScore" to s.bestScore, "maxCombo" to s.maxCombo, "maxTps" to s.maxTps.toDouble(), "perfects" to s.perfects,
+        "bestScore" to s.bestScore, "arenaBest" to s.arenaBest, "arenaMatches" to s.arenaMatches, "maxCombo" to s.maxCombo, "maxTps" to s.maxTps.toDouble(), "perfects" to s.perfects,
         "stopErrors" to s.stopErrors, "stopsSurvived" to s.stopsSurvived, "zoneHits" to s.zoneHits,
         "coinsEarned" to s.coinsEarned, "playTimeMs" to s.playTimeMs, "frenzies" to s.frenzies,
         "megaFrenzies" to s.megaFrenzies, "bossesDefeated" to s.bossesDefeated, "goldenHits" to s.goldenHits,
@@ -101,6 +107,11 @@ object SaveCodec {
             val stage = k.toIntOrNull() ?: continue
             d.stageBest[stage] = ((v as? Number)?.toLong() ?: 0L).coerceIn(0L, MAX_SCORE)
         }
+        for ((k, v) in o.obj("stageBestTime").map) {
+            val stage = k.toIntOrNull() ?: continue
+            val ms = (v as? Number)?.toLong() ?: continue
+            if (ms > 0L) d.stageBestTime[stage] = ms.coerceAtMost(MAX_STAGE_TIME_MS)
+        }
         for ((k, v) in o.obj("stageFailStreak").map) {
             val stage = k.toIntOrNull() ?: continue
             d.stageFailStreak[stage] = ((v as? Number)?.toInt() ?: 0).coerceIn(0, 99)
@@ -122,7 +133,7 @@ object SaveCodec {
         d.missionCounter = o.int("missionCounter").coerceAtLeast(d.missions.maxOfOrNull { it.id } ?: 0)
         d.dailyLastDay = o.long("dailyLastDay", -1L)
         d.dailyStreak = o.int("dailyStreak").coerceIn(0, 100_000)
-        for (r in o.objList("ranking")) {
+        for (r in o.objList("arenaRanking")) {
             d.ranking += RankEntry(
                 score = r.long("score").coerceIn(0L, MAX_SCORE), stage = r.int("stage"), maxCombo = r.int("combo"),
                 maxTps = r.float("tps"), taps = r.long("taps"), timestamp = r.long("ts"), dayIndex = r.long("day"),
@@ -130,6 +141,8 @@ object SaveCodec {
             )
         }
         d.ranking.sortByDescending { it.score }
+        d.arenaWeekId = o.string("arenaWeekId").take(8)
+        d.arenaWeekBest = o.long("arenaWeekBest").coerceIn(0L, MAX_SCORE)
         val s = o.obj("settings")
         d.settings.music = s.bool("music", true)
         d.settings.sfx = s.bool("sfx", true)
@@ -152,8 +165,11 @@ object SaveCodec {
         d.online.bestTaps = online.long("bestTaps").coerceIn(0L, 3_000L)
         d.online.bestTps10 = online.long("bestTps10").coerceIn(0L, 250L)
         d.online.bestStage = online.long("bestStage").coerceIn(0L, MAX_STAGE.toLong())
-        d.online.weekId = online.string("weekId").take(8)
-        d.online.weekBest = online.long("weekBest").coerceIn(0L, MAX_SCORE)
+        d.online.arenaBest = online.long("arenaBest").coerceIn(0L, MAX_SCORE)
+        d.online.arenaTaps = online.long("arenaTaps").coerceIn(0L, 3_000L)
+        d.online.arenaTps10 = online.long("arenaTps10").coerceIn(0L, 250L)
+        d.online.arenaWeekId = online.string("arenaWeekId").take(8)
+        d.online.arenaWeekBest = online.long("arenaWeekBest").coerceIn(0L, MAX_SCORE)
         d.online.dirty = online.bool("dirty")
         for (name in o.list("seenIntros")) {
             Mechanic.values().firstOrNull { it.name == name }?.let { d.seenIntros += it }
@@ -167,6 +183,8 @@ object SaveCodec {
         s.matches = o.int("matches").coerceAtLeast(0)
         s.wins = o.int("wins").coerceAtLeast(0)
         s.bestScore = o.long("bestScore").coerceIn(0L, MAX_SCORE)
+        s.arenaBest = o.long("arenaBest").coerceIn(0L, MAX_SCORE)
+        s.arenaMatches = o.int("arenaMatches").coerceAtLeast(0)
         s.maxCombo = o.int("maxCombo").coerceAtLeast(0)
         s.maxTps = o.float("maxTps").coerceIn(0f, 30f)
         s.perfects = o.long("perfects").coerceAtLeast(0)
@@ -196,6 +214,7 @@ object SaveCodec {
     private const val MAX_XP = 9_999_999_999L
     private const val MAX_SCORE = 99_999_999L
     private const val MAX_STAGE = 9_999
+    private const val MAX_STAGE_TIME_MS = 600_000L
     private const val MAX_RELEASE_JSON = 16_384
     private val LANGUAGES = setOf("auto", "pt", "en")
 }

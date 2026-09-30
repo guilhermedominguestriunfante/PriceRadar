@@ -33,6 +33,8 @@ fun result(
     type: StageType = StageType.SPEED,
     playedMs: Long = 60_000,
     failReason: FailReason = if (won) FailReason.NONE else FailReason.OBJECTIVE,
+    limitMs: Long = 60_000,
+    endedEarly: Boolean = won && playedMs < limitMs,
 ) = MatchResult(
     stageNumber = stage, stageType = type, isBoss = isBoss, won = won, failReason = failReason, stars = stars,
     score = score, taps = taps, touches = touches, tapValue = tapValue, maxCombo = maxCombo, maxTps = maxTps,
@@ -40,4 +42,5 @@ fun result(
     stopsSurvived = stopsSurvived, stopErrors = stopErrors, frenzies = frenzies, megaFrenzies = 0,
     coinsCollected = coins, goldenHits = 0, reflexBestMs = -1, timeBonusMs = 0, playedMs = playedMs, livesLeft = 0,
     objectiveProgress = taps, objectiveTarget = 100, droppedTaps = 0, badTimestamps = 0,
+    limitMs = limitMs, endedEarly = endedEarly,
 )

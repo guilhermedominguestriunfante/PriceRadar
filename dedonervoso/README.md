@@ -1,10 +1,11 @@
 # Dedo Nervoso
 
 Jogo arcade de reflexo para Android: toque o mais rápido que conseguir, **pare no STOP**,
-acerte as **Hot Zones**, encha o **FRENZY** e avance por fases infinitas com chefes a cada 10.
-Partidas de 60 segundos, neon, som e vibração em cada toque — e ranking online com os amigos.
+acerte as **Hot Zones**, encha o **FRENZY** e avance por fases infinitas com um **boss** a cada 10.
+Cada fase acaba assim que a missão é cumprida (60 s são o limite) e as estrelas vêm do tempo; a
+**Arena** da semana (60 s iguais para todos, sem upgrades) vale no ranking online com os amigos.
 
-- Pacote: `com.dedonervoso.app` · versão **1.1.0** (versionCode 2)
+- Pacote: `com.dedonervoso.app` · versão **1.3.0** (versionCode 5)
 - Android 8.0+ (minSdk 26) · targetSdk 35 · somente retrato
 - Offline por padrão; online opcional (Firebase). Sem anúncios, sem compras, sem pay-to-win.
 - Idiomas: português e inglês (automático pelo sistema ou escolhido nas configurações).
@@ -39,7 +40,13 @@ sem perder o progresso.
 4. **FRENZY**: a barra inferior enche com o combo. Cheia = 5 s de pontos em dobro
    (e, raramente, o **MEGA FRENZY**: 6,5 s valendo x4). A **GOLDEN ZONE** aparece de
    surpresa e vale muitas moedas.
-5. Ao final: estrelas, recordes, **TAP COINS** e XP. Gaste as moedas nos **upgrades**.
+5. **Missão cumprida = fim da fase.** As estrelas vêm do tempo (+2 s por STOP errado); o recorde
+   de cada fase é o melhor tempo. Nas fases de sobrevivência, passe por todos os STOPs.
+6. **Boss** (fases 10, 20, 30…): toque nele (×3; o centro é PERFECT) até zerar a vida. Ele foge,
+   ruge (STOP) e ataca: escudo, investida, apagão, -3 s e teleporte, e fica mais bravo ferido.
+7. **Arena** (depois do primeiro boss): 60 s valendo pontos, sem upgrades, a mesma para todos na
+   semana. É ela que conta nos rankings.
+8. Ao final: estrelas, recordes, **TAP COINS** e XP. Gaste as moedas nos **upgrades**.
 
 Vale tocar com dois dedos; um terceiro dedo simultâneo é ignorado.
 Sair do app pausa a partida; ao voltar, há contagem 3-2-1.

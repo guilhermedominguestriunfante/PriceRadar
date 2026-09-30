@@ -19,8 +19,8 @@ androidApk {
     resourcesSdk.set(34)
     minSdk.set(26)
     targetSdk.set(35)
-    versionCode.set(4)
-    versionName.set("1.2.0")
+    versionCode.set(5)
+    versionName.set("1.3.0")
     apkBaseName.set("dedo-nervoso")
     proguardFiles.from("proguard-rules.pro")
 }

@@ -2,6 +2,7 @@ package com.dedonervoso.core.progression
 
 import com.dedonervoso.core.engine.Loadout
 import com.dedonervoso.core.engine.MatchResult
+import com.dedonervoso.core.online.OnlineService
 import com.dedonervoso.core.save.SaveCodec
 import com.dedonervoso.core.save.SaveData
 import com.dedonervoso.core.stage.Mechanic
@@ -39,8 +40,13 @@ class MatchOutcome(
     val levelBefore: Int,
     val levelAfter: Int,
     val levelUpCoins: Int,
-    val newBestScore: Boolean,
-    val previousBestScore: Long,
+    /**
+     * Beat a record that already existed: the stage's best time (campaign) or the Arena best
+     * (Arena). The first clear or first Arena match sets a record without celebrating it.
+     */
+    val newRecord: Boolean,
+    /** The record before this match: best time in ms (campaign) or points (Arena); 0 if none. */
+    val previousRecord: Long,
     val newStageBest: Boolean,
     val newMaxCombo: Boolean,
     val newMaxTps: Boolean,
@@ -50,10 +56,14 @@ class MatchOutcome(
     val achievements: List<AchievementDef>,
     val achievementCoins: Int,
     val missionsCompleted: List<Mission>,
+    /** Arena: place of this match among this device's Arena results (1-based), or -1. */
     val rank: Int,
+    val arena: Boolean = false,
+    /** Arena: this week's best on this device after the match. */
+    val arenaWeekBest: Long = 0L,
 ) {
     val totalCoins: Int get() = coins.total + dailyCoins + levelUpCoins + achievementCoins
-    val anyRecord: Boolean get() = newBestScore || newMaxCombo || newMaxTps
+    val anyRecord: Boolean get() = newRecord || newMaxCombo || newMaxTps
 }
 
 /**
@@ -108,7 +118,7 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
         return StageConfig(
             number = base.number,
             type = base.type,
-            target = if (base.type == StageType.SURVIVAL) base.target else scaled(base.target),
+            target = scaled(base.target),
             scoreTarget = if (base.type == StageType.BOSS || base.type == StageType.SCORE) scaled(base.scoreTarget) else base.scoreTarget,
             star2Score = base.star2Score,
             star3Score = base.star3Score,
@@ -123,6 +133,12 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
             introduces = base.introduces,
             seed = base.seed,
             customTitle = base.customTitle,
+            endOnObjective = base.endOnObjective,
+            // A lower objective is met sooner: the star times shrink with it.
+            star2TimeMs = (base.star2TimeMs * factor).toLong(),
+            star3TimeMs = (base.star3TimeMs * factor).toLong(),
+            boss = base.boss,
+            bossTier = base.bossTier,
         )
     }
 
@@ -142,18 +158,23 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
 
     // ---- match results ---------------------------------------------------------------------------
 
+    /** The Arena of this week (same seed for everyone until Monday 00:00 UTC). */
+    fun arena(): StageConfig = StageCatalog.arena(OnlineService.weekIndex(clock.nowMs()))
+
+    /** The Arena opens after the first boss. */
+    val arenaUnlocked: Boolean get() = save.highestCleared >= StageCatalog.BOSS_EVERY
+
     fun applyMatch(result: MatchResult, stage: StageConfig, daily: Boolean = false): MatchOutcome {
         result.suspicious = ResultValidator.isSuspicious(result)
+        val arena = stage.number == StageCatalog.ARENA
         val s = save.stats
         val levelBefore = level
-        val previousBest = s.bestScore
-        val newBestScore = result.score > s.bestScore
         val newMaxCombo = result.maxCombo > s.maxCombo
         val newMaxTps = result.maxTps > s.maxTps + 0.01f && result.maxTps > 0f
 
         // Lifetime statistics.
         s.matches++
-        if (result.won) s.wins++
+        if (result.won && !arena) s.wins++
         s.totalTaps += result.taps
         s.totalTouches += result.touches
         s.perfects += result.perfects
@@ -164,20 +185,35 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
         s.frenzies += result.frenzies
         s.megaFrenzies += result.megaFrenzies
         s.goldenHits += result.goldenHits
-        if (newBestScore) s.bestScore = result.score
         if (newMaxCombo) s.maxCombo = result.maxCombo
         if (newMaxTps) s.maxTps = result.maxTps
         if (result.reflexBestMs >= 0 && (s.reflexBestMs < 0 || result.reflexBestMs < s.reflexBestMs)) s.reflexBestMs = result.reflexBestMs
         if (result.won && result.isBoss) s.bossesDefeated++
         if (result.won && result.interrupts >= 3 && result.stopErrors == 0) s.flawlessStages++
 
-        // Stage progress (the daily challenge lives outside the ladder).
+        // Records and stage progress (the daily challenge and the Arena live outside the ladder).
         val n = stage.number
-        val starsBefore = if (daily) 0 else save.stageStars[n] ?: 0
+        val ladder = !daily && !arena
+        val starsBefore = if (ladder) save.stageStars[n] ?: 0 else 0
         var starsAfter = starsBefore
         var unlocked: Int? = null
         var newStageBest = false
-        if (!daily) {
+        var newRecord = false
+        var previousRecord = 0L
+        if (arena) {
+            s.arenaMatches++
+            previousRecord = s.arenaBest
+            if (!result.suspicious && result.score > s.arenaBest) {
+                newRecord = s.arenaBest > 0L
+                s.arenaBest = result.score
+            }
+            val week = OnlineService.isoWeek(clock.nowMs())
+            if (save.arenaWeekId != week) {
+                save.arenaWeekId = week
+                save.arenaWeekBest = 0L
+            }
+            if (!result.suspicious && result.score > save.arenaWeekBest) save.arenaWeekBest = result.score
+        } else if (ladder) {
             if (result.won) {
                 starsAfter = max(starsBefore, result.stars)
                 save.stageStars[n] = starsAfter
@@ -187,21 +223,29 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
                     save.selectedStage = n + 1
                     unlocked = n + 1
                 }
+                // The stage's record is its best graded time.
+                previousRecord = save.stageBestTime[n] ?: 0L
+                if (previousRecord == 0L || result.gradeTimeMs < previousRecord) {
+                    save.stageBestTime[n] = result.gradeTimeMs
+                    newRecord = previousRecord > 0L
+                    newStageBest = true
+                }
             } else if (result.failReason != com.dedonervoso.core.engine.FailReason.ABORTED) {
                 save.stageFailStreak[n] = (save.stageFailStreak[n] ?: 0) + 1
             }
-            if (result.score > (save.stageBest[n] ?: 0L)) {
-                save.stageBest[n] = result.score
-                newStageBest = true
-            }
+            if (result.score > (save.stageBest[n] ?: 0L)) save.stageBest[n] = result.score
         }
         val newStars = starsAfter - starsBefore
 
         // Coins.
-        val coins = Economy.matchCoins(
-            result, newStars, firstClear = !daily && starsBefore == 0 && result.won,
-            newRecord = newBestScore && previousBest > 0, coinBoostLevel = loadout.coinBoostLevel,
-        )
+        val coins = if (arena) {
+            Economy.arenaCoins(result, newRecord, loadout.coinBoostLevel)
+        } else {
+            Economy.matchCoins(
+                result, newStars, firstClear = ladder && starsBefore == 0 && result.won,
+                newRecord = newRecord, coinBoostLevel = loadout.coinBoostLevel, replay = ladder && starsBefore > 0,
+            )
+        }
         var dailyCoins = 0
         if (daily && result.won && dailyRewardAvailable) {
             val todayIdx = today
@@ -212,7 +256,7 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
         }
 
         // XP & level ups.
-        val xp = Economy.matchXp(result)
+        val xp = if (arena) Economy.arenaXp(result) else Economy.matchXp(result)
         save.totalXp += xp
         val levelAfter = level
         var levelUpCoins = 0
@@ -220,14 +264,13 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
 
         addCoins(coins.total + dailyCoins + levelUpCoins)
 
-        // Missions, ranking, achievements.
+        // Missions, ranking (the Arena's), achievements.
         val completedMissions = Missions.apply(save.missions, result, newStars)
         val now = clock.nowMs()
-        val rank = leaderboard.submit(
+        val rank = if (!arena) -1 else leaderboard.submit(
             RankEntry(
-                score = result.score, stage = n, maxCombo = result.maxCombo, maxTps = result.maxTps,
-                taps = result.taps, timestamp = now, dayIndex = clock.dayIndex(now), daily = daily,
-                suspicious = result.suspicious,
+                score = result.score, stage = save.highestCleared, maxCombo = result.maxCombo, maxTps = result.maxTps,
+                taps = result.taps, timestamp = now, dayIndex = clock.dayIndex(now), suspicious = result.suspicious,
             ),
         )
         val newAchievements = unlockAchievements()
@@ -237,10 +280,10 @@ class Progression(save: SaveData, private val clock: GameClock = GameClock.Syste
         return MatchOutcome(
             result = result, stage = stage, daily = daily, coins = coins, dailyCoins = dailyCoins, xpGained = xp,
             levelBefore = levelBefore, levelAfter = levelAfter, levelUpCoins = levelUpCoins,
-            newBestScore = newBestScore, previousBestScore = previousBest, newStageBest = newStageBest,
+            newRecord = newRecord, previousRecord = previousRecord, newStageBest = newStageBest,
             newMaxCombo = newMaxCombo, newMaxTps = newMaxTps, starsBefore = starsBefore, starsAfter = starsAfter,
             unlockedStage = unlocked, achievements = newAchievements, achievementCoins = achievementCoins,
-            missionsCompleted = completedMissions, rank = rank,
+            missionsCompleted = completedMissions, rank = rank, arena = arena, arenaWeekBest = save.arenaWeekBest,
         )
     }
 

@@ -91,7 +91,75 @@ class ProgressionTest {
         }
         val cheapest = Upgrades.ALL.minOf { it.costs[0] }
         val firstMatch = Economy.matchCoins(result(stage = 1, won = true, touches = 300, maxCombo = 60), 1, true, false, 0)
-        assertTrue(firstMatch.total >= cheapest / 2, "first upgrade is within a couple of matches")
+        assertTrue(firstMatch.total * 3 >= cheapest, "the first upgrade is a few matches away")
+    }
+
+    @Test
+    fun coinsComeSlowlyAndSpeedPays() {
+        // A mid-ladder stage cleared again, the way most matches are played.
+        fun replay(playedMs: Long) = Economy.matchCoins(
+            result(stage = 15, won = true, touches = 250, maxCombo = 300, playedMs = playedMs), 0,
+            firstClear = false, newRecord = false, coinBoostLevel = 0, replay = true,
+        )
+        val slow = replay(59_000)
+        val fast = replay(35_000)
+        assertTrue(fast.speed > slow.speed, "finishing early pays a speed bonus")
+        assertTrue(fast.total <= 40, "a replayed stage pays little (${fast.total})")
+        val first = Economy.matchCoins(result(stage = 15, won = true, touches = 250, maxCombo = 300, playedMs = 35_000), 2, true, false, 0)
+        assertTrue(first.total > fast.total * 2, "first clears still pay well")
+        // Maxing every upgrade takes many hours of play, not an afternoon.
+        assertTrue(Upgrades.totalCost / fast.total > 1_000, "upgrades are long-term goals")
+    }
+
+    @Test
+    fun stageRecordIsTheBestTime() {
+        val p = fresh()
+        val first = p.applyMatch(result(stage = 1, won = true, playedMs = 30_000), StageCatalog.stage(1))
+        assertFalse(first.newRecord, "the first clear sets the record without celebrating it")
+        assertEquals(30_000L, p.save.stageBestTime[1])
+        val slower = p.applyMatch(result(stage = 1, won = true, playedMs = 32_000), StageCatalog.stage(1))
+        assertFalse(slower.newRecord)
+        val faster = p.applyMatch(result(stage = 1, won = true, playedMs = 25_000, stopErrors = 1), StageCatalog.stage(1))
+        assertTrue(faster.newRecord, "25 s + 2 s for the STOP error beats 30 s")
+        assertEquals(27_000L, p.save.stageBestTime[1])
+        assertEquals(30_000L, faster.previousRecord)
+        assertTrue(p.save.ranking.isEmpty(), "campaign matches are not ranked")
+    }
+
+    @Test
+    fun arenaMatchesAreRankedAndLeaveTheLadderAlone() {
+        val p = fresh()
+        assertFalse(p.arenaUnlocked)
+        p.save.highestUnlocked = 11
+        assertTrue(p.arenaUnlocked)
+        val arena = p.arena()
+        assertEquals(StageCatalog.ARENA, arena.number)
+        assertFalse(arena.endOnObjective)
+        val o = p.applyMatch(result(stage = StageCatalog.ARENA, score = 3_000), arena)
+        assertTrue(o.arena)
+        assertEquals(1, o.rank)
+        assertFalse(o.newRecord, "the first Arena match sets the record")
+        assertEquals(3_000L, p.save.stats.arenaBest)
+        assertEquals(3_000L, o.arenaWeekBest)
+        assertEquals(11, p.save.highestUnlocked)
+        assertTrue(p.save.stageStars.isEmpty())
+        val better = p.applyMatch(result(stage = StageCatalog.ARENA, score = 4_200), arena)
+        assertTrue(better.newRecord)
+        assertEquals(listOf(4_200L, 3_000L), p.save.ranking.map { it.score })
+        // A new week starts a new weekly best (the all-time best stays).
+        clock.advanceDays(7)
+        val nextWeek = p.applyMatch(result(stage = StageCatalog.ARENA, score = 1_000), p.arena())
+        assertEquals(1_000L, nextWeek.arenaWeekBest)
+        assertEquals(4_200L, p.save.stats.arenaBest)
+    }
+
+    @Test
+    fun preArenaRankingIsDroppedOnLoad() {
+        val text = """{"version":1,"ranking":[{"score":9000,"stage":12,"combo":300,"tps":10.0,"taps":500,"ts":1,"day":1}],
+            "stats":{"bestScore":9000}}"""
+        val d = SaveCodec.decode(text)
+        assertTrue(d.ranking.isEmpty(), "old campaign results leave the device ranking")
+        assertEquals(9_000L, d.stats.bestScore, "and stay as the classic record")
     }
 
     @Test
@@ -184,8 +252,8 @@ class ProgressionTest {
     @Test
     fun suspiciousResultsAreFlaggedButStillCount() {
         val p = fresh()
-        val cheat = result(stage = 1, won = true, touches = 5_000, taps = 5_000, maxTps = 80f)
-        val o = p.applyMatch(cheat, StageCatalog.stage(1))
+        val cheat = result(stage = StageCatalog.ARENA, won = true, touches = 5_000, taps = 5_000, maxTps = 80f)
+        val o = p.applyMatch(cheat, StageCatalog.arena(1))
         assertTrue(o.result.suspicious)
         assertTrue(p.save.ranking.first().suspicious)
         assertNull(p.leaderboard.best)
@@ -201,7 +269,8 @@ class ProgressionTest {
         p.setAvatar(5)
         p.save.settings.vibration = false
         p.save.settings.language = "en"
-        p.applyMatch(result(stage = 1, won = true, stars = 3, perfects = 7), StageCatalog.stage(1))
+        p.applyMatch(result(stage = 1, won = true, stars = 3, perfects = 7, playedMs = 31_000), StageCatalog.stage(1))
+        p.applyMatch(result(stage = StageCatalog.ARENA, score = 2_500), StageCatalog.arena(1))
         p.save.upgrades[UpgradeId.COMBO_BOOST] = 2
         p.markIntroSeen(com.dedonervoso.core.stage.Mechanic.STOP)
         val text = SaveCodec.encode(p.save)
@@ -215,6 +284,9 @@ class ProgressionTest {
         assertEquals(7L, back.stats.perfects)
         assertEquals(p.save.missions.size, back.missions.size)
         assertEquals(p.save.ranking.size, back.ranking.size)
+        assertEquals(1, back.ranking.size)
+        assertEquals(31_000L, back.stageBestTime[1])
+        assertEquals(2_500L, back.stats.arenaBest)
         assertTrue(com.dedonervoso.core.stage.Mechanic.STOP in back.seenIntros)
     }
 

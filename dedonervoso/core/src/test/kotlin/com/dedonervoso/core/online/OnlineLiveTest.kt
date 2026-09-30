@@ -25,7 +25,7 @@ class OnlineLiveTest {
         assumeTrue(key.isNotBlank(), "DEDO_FIREBASE_API_KEY not set")
         val project = System.getenv("DEDO_FIREBASE_PROJECT_ID") ?: System.getProperty("dedo.firebaseProjectId").orEmpty()
         val config = FirebaseConfig(project, key)
-        fun service() = OnlineService(FirebaseClient(config, http), appVersion = 3)
+        fun service() = OnlineService(FirebaseClient(config, http), appVersion = 5)
 
         val alice = OnlineProfile("TESTE_A", 1, 1)
         val bob = OnlineProfile("TESTE_B", 2, 1)
@@ -44,7 +44,7 @@ class OnlineLiveTest {
             Thread.sleep(2_100)   // weekly scores accept one write every 2 s
             service().submit(b, bob, OnlineResult(2, 20, 2f, 1))
             val week = OnlineService.isoWeek(System.currentTimeMillis())
-            traces += listOf("weeks/$week/scores/${a.uid}", "weeks/$week/scores/${b.uid}")
+            traces += listOf("${OnlineService.ARENA_WEEKS}/$week/scores/${a.uid}", "${OnlineService.ARENA_WEEKS}/$week/scores/${b.uid}")
 
             val friends = service().leaderboard(b, OnlineBoard.FRIENDS, OnlineMetric.SCORE)
             assertEquals(listOf("TESTE_B" to 2L, "TESTE_A" to 1L), friends.map { it.nick to it.score })
@@ -52,6 +52,8 @@ class OnlineLiveTest {
             for (board in listOf(OnlineBoard.GLOBAL, OnlineBoard.WEEK)) {
                 for (metric in OnlineMetric.values()) service().leaderboard(a, board, metric)
             }
+            // And the "top X%" count of the weekly Arena board.
+            assertEquals(0L, service().weekStanding(b, 2).above)
         } finally {
             if (a.exists) service().deleteAccount(a)
             if (b.exists) service().deleteAccount(b)

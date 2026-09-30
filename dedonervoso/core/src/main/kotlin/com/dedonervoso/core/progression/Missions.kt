@@ -1,6 +1,7 @@
 package com.dedonervoso.core.progression
 
 import com.dedonervoso.core.engine.MatchResult
+import com.dedonervoso.core.stage.StageCatalog
 import com.dedonervoso.core.util.Rng
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -51,7 +52,8 @@ object Missions {
             MissionKind.PLAY_MATCHES -> 3 + playerLevel / 8
             MissionKind.WIN_STAGES -> 2 + playerLevel / 10
             MissionKind.REACH_COMBO -> round(minOf(400f, 40 * s), 10)
-            MissionKind.SCORE_IN_MATCH -> round(minOf(40_000f, 700 * s * s), 100)
+            // Stages end at their objective now: stay within what a stage of the player's level yields.
+            MissionKind.SCORE_IN_MATCH -> round(minOf(700 * s * s, StageCatalog.expectedScore(highestStage) * 0.6f), 100)
             MissionKind.REACH_TPS -> minOf(14, 6 + playerLevel / 5)
             MissionKind.EARN_STARS -> 3 + playerLevel / 10
             MissionKind.FRENZIES -> 2 + playerLevel / 10
@@ -59,7 +61,7 @@ object Missions {
             MissionKind.ZONE_HITS -> round(30 * s, 5)
             MissionKind.PERFECTS -> round(8 * s, 1)
         }
-        val coins = round(40f + 12f * playerLevel + rng.nextInt(20), 5)
+        val coins = round(20f + 5f * playerLevel + rng.nextInt(10), 5)
         val xp = round(30f + 8f * playerLevel, 5)
         return Mission(id, kind, max(1, target), 0, coins, xp)
     }

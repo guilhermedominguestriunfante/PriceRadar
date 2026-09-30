@@ -1,5 +1,6 @@
 package com.dedonervoso.core.stage
 
+import com.dedonervoso.core.engine.BossKind
 import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.PenaltyTier
 import com.dedonervoso.core.engine.ZoneType
@@ -14,13 +15,13 @@ enum class StageType {
     COMBO,
     /** Hit hot zones X times. */
     PRECISION,
-    /** Finish without (more than N) STOP errors. */
+    /** Get through N STOPs (errors allowed = lives − 1). */
     SURVIVAL,
     /** Land X perfect taps. */
     PERFECT,
     /** Trigger FRENZY X times. */
     FRENZY,
-    /** Intense mix: reach the score and keep at least one life. */
+    /** Beat the boss: bring its health (the score target) to zero and keep at least one life. */
     BOSS,
 }
 
@@ -44,9 +45,12 @@ class StopConfig(
     /** Probability that an interrupt is a FAKE STOP (warning that resolves into GO!). */
     val fakeChance: Float = 0f,
     val minGapMs: Long = 5_000L,
+    /** At least this many interrupts are holds (STOP or REFLEX), never FAKE (SURVIVAL stages). */
+    val minHolds: Int = 0,
 ) {
     init {
         require(countMin in 0..countMax) { "bad STOP count range" }
+        require(minHolds <= countMin) { "more holds required than planned" }
         require(durationMinMs in 1..durationMaxMs) { "bad STOP duration range" }
         require(graceMs >= GameBalance.MIN_REACTION_GRACE_MS) { "grace below human reaction floor" }
     }
@@ -118,7 +122,22 @@ class StageConfig(
     val seed: Long = number.toLong(),
     /** Custom label for special stages (e.g. daily challenge). */
     val customTitle: String? = null,
+    /**
+     * The match ends as soon as the objective is met (campaign and daily challenge): the time
+     * limit is only a maximum. Arena and duels always play the full time.
+     */
+    val endOnObjective: Boolean = false,
+    /**
+     * Graded time (see [com.dedonervoso.core.engine.MatchResult.gradeTimeMs]) for 2 and 3 stars.
+     * 0 = stars come from [star2Score]/[star3Score] instead.
+     */
+    val star2TimeMs: Long = 0L,
+    val star3TimeMs: Long = 0L,
+    /** The boss of a BOSS stage (null elsewhere). */
+    val boss: BossKind? = null,
+    val bossTier: Int = 0,
 ) {
+    val timedStars: Boolean get() = star3TimeMs > 0L
     val hasStop: Boolean get() = stop != null
     val hasZones: Boolean get() = zones != null
     val hasFrenzy: Boolean get() = frenzy != null

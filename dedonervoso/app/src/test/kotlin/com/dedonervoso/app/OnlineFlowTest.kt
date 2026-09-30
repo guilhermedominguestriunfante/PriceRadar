@@ -52,7 +52,7 @@ class OnlineFlowTest {
     /** A friend who already plays online (made directly through the service). */
     private fun friend(nick: String, score: Long): OnlineAccount {
         val account = OnlineAccount()
-        OnlineService(FirebaseClient(FirebaseConfig.emulator(project), http), 2)
+        OnlineService(FirebaseClient(FirebaseConfig.emulator(project), http), GameHarness.buildVersion)
             .connect(account, OnlineProfile(nick, 3, 7), OnlineResult(score, 400, 9.5f, 9))
         return account
     }
@@ -76,7 +76,7 @@ class OnlineFlowTest {
         h.awaitCondition("global board") { "BOB" in (h.app.host.current as RankingScreen).onlineNicksForTest }
         h.frames(20)
         h.screenshot("61_online_global")
-        // The local best (7,890) was published and ranks above Bob's 5,000.
+        // The local Arena best (7,890) was published and ranks above Bob's 5,000.
         val rows = (h.app.host.current as RankingScreen).onlineNicksForTest
         assertEquals(listOf("KAWE", "BOB"), rows)
 
@@ -99,11 +99,35 @@ class OnlineFlowTest {
     }
 
     @Test
-    fun finishedMatchReachesTheWeeklyBoard() {
+    fun arenaMatchReachesTheWeeklyBoard() {
         useEmulators()
         val save = GameHarness.progressedSave()
         save.onlineEnabled = true
         save.seenIntros += com.dedonervoso.core.stage.Mechanic.values()
+        save.ranking.clear()
+        val h = GameHarness().launch(save)
+        h.awaitCondition("connected") { h.app.online.status == Online.Status.READY }
+        h.click(h.app.strings.arena, 60)
+        h.playMatch()
+        assertTrue(h.app.host.current is com.dedonervoso.app.ui.screens.ResultScreen)
+        val client = FirebaseClient(FirebaseConfig.emulator(project), http)
+        val acc = h.app.progression.save.online
+        h.awaitCondition("weekly Arena score published") {
+            val s = client.resume(acc.uid, acc.refreshToken)
+            client.get(s, "${OnlineService.ARENA_WEEKS}/${OnlineService.isoWeek(System.currentTimeMillis())}/scores/${acc.uid}") != null
+        }
+        // The result shows where the match stands this week (alone on the board: #1 / 1).
+        h.frames(120)
+        h.screenshot("65_arena_result_online")
+    }
+
+    @Test
+    fun campaignMatchesStayOffTheBoards() {
+        useEmulators()
+        val save = GameHarness.progressedSave()
+        save.onlineEnabled = true
+        save.seenIntros += com.dedonervoso.core.stage.Mechanic.values()
+        save.ranking.clear()
         save.selectedStage = 1
         val h = GameHarness().launch(save)
         h.awaitCondition("connected") { h.app.online.status == Online.Status.READY }
@@ -111,10 +135,10 @@ class OnlineFlowTest {
         h.playMatch()
         val client = FirebaseClient(FirebaseConfig.emulator(project), http)
         val acc = h.app.progression.save.online
-        h.awaitCondition("weekly score published") {
-            val s = client.resume(acc.uid, acc.refreshToken)
-            client.get(s, "weeks/${OnlineService.isoWeek(System.currentTimeMillis())}/scores/${acc.uid}") != null
-        }
+        h.frames(60)
+        val s = client.resume(acc.uid, acc.refreshToken)
+        assertEquals(null, client.get(s, "${OnlineService.ARENA_WEEKS}/${OnlineService.isoWeek(System.currentTimeMillis())}/scores/${acc.uid}"))
+        assertEquals(12L, client.get(s, "players/${acc.uid}")!!.long("bestStage"))
     }
 
     @Test

@@ -46,6 +46,17 @@ interface GameListener {
     /** The opponent's [item] landed. */
     fun onItemHit(item: DuelItem) {}
 
+    // ---- bosses ----
+    /** The boss is about to [attack] (a short telegraph). */
+    fun onBossWarning(attack: BossAttack) {}
+    fun onBossAttack(attack: BossAttack) {}
+    fun onBossAttackEnd(attack: BossAttack) {}
+    fun onBossTeleport() {}
+    /** The boss got angrier: 1 at half health, 2 at a fifth. */
+    fun onBossRage(rage: Int) {}
+    /** A tap hit the shielded boss and did nothing. */
+    fun onBossBlocked(x: Float, y: Float) {}
+
     companion object {
         val NONE: GameListener = object : GameListener {}
     }

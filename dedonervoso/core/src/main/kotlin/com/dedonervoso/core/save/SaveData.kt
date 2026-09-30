@@ -37,6 +37,8 @@ class SaveData(
     var selectedStage: Int = 1,
     val stageStars: MutableMap<Int, Int> = HashMap(),
     val stageBest: MutableMap<Int, Long> = HashMap(),
+    /** Best graded time (ms) per stage cleared: the stage's record since stages end on their objective. */
+    val stageBestTime: MutableMap<Int, Long> = HashMap(),
     /** Consecutive failures per stage (drives the light adaptive assist, spec §56). */
     val stageFailStreak: MutableMap<Int, Int> = HashMap(),
     val upgrades: MutableMap<UpgradeId, Int> = HashMap(),
@@ -47,7 +49,11 @@ class SaveData(
     var missionCounter: Int = 0,
     var dailyLastDay: Long = -1L,
     var dailyStreak: Int = 0,
+    /** Arena results (the device ranking); older campaign results are not kept. */
     val ranking: MutableList<RankEntry> = ArrayList(),
+    /** ISO week of [arenaWeekBest] (e.g. "2026-W40"): the Arena changes every week. */
+    var arenaWeekId: String = "",
+    var arenaWeekBest: Long = 0L,
     val settings: Settings = Settings(),
     var onboardingDone: Boolean = false,
     val seenIntros: MutableSet<Mechanic> = HashSet(),

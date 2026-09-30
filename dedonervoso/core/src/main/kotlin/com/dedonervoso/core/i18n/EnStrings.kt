@@ -1,5 +1,7 @@
 package com.dedonervoso.core.i18n
 
+import com.dedonervoso.core.engine.BossAttack
+import com.dedonervoso.core.engine.BossKind
 import com.dedonervoso.core.engine.DuelItem
 import com.dedonervoso.core.engine.GameBalance
 import com.dedonervoso.core.engine.ReflexGrade
@@ -93,10 +95,10 @@ object EnStrings : Strings() {
         StageType.SCORE -> "Score ${num(target)} points"
         StageType.COMBO -> "Reach a ${num(target)} combo"
         StageType.PRECISION -> "Hit ${num(target)} Hot Zones"
-        StageType.SURVIVAL -> if (target == 0) "Survive without STOP errors" else "Survive with at most $target STOP error" + (if (target > 1) "s" else "")
+        StageType.SURVIVAL -> if (target == 1) "Get through 1 STOP" else "Get through $target STOPs"
         StageType.PERFECT -> "Land ${num(target)} PERFECT taps"
         StageType.FRENZY -> if (target == 1) "Trigger FRENZY" else "Trigger FRENZY $target times"
-        StageType.BOSS -> "Score ${num(scoreTarget)} without losing all lives"
+        StageType.BOSS -> "Beat the boss"
     }
 
     override fun mechanicTitle(m: Mechanic) = when (m) {
@@ -122,7 +124,7 @@ object EnStrings : Strings() {
         Mechanic.COINS -> "Clear stages and beat records to earn coins for upgrades."
         Mechanic.FRENZY -> "Fill the bar: 5 seconds of double points!"
         Mechanic.STOP -> "When STOP appears, STOP tapping. Go again on TAP!"
-        Mechanic.BOSS -> "The arena fights back: frequent STOPs and only 3 lives."
+        Mechanic.BOSS -> "Tap the boss (x3) until its health is gone. It runs and attacks: mind its roar (STOP)!"
         Mechanic.HOT_ZONES -> "Tap inside zones to multiply your points."
         Mechanic.PERFECT -> "Hit a zone's center for a PERFECT."
         Mechanic.REFLEX -> "READY… WAIT… hold still, then react fast on TAP!"
@@ -139,7 +141,7 @@ object EnStrings : Strings() {
         UpgradeId.COMBO_BOOST -> "Combo tiers arrive 8% sooner per level."
         UpgradeId.COMBO_SHIELD -> "Saves one combo break per match (per level)."
         UpgradeId.STOP_SHIELD -> "Ignores one accidental STOP tap per level."
-        UpgradeId.COIN_BOOST -> "+10% coins per level."
+        UpgradeId.COIN_BOOST -> "+6% coins per level."
         UpgradeId.HOT_ZONE_BOOST -> "Bigger zones, +10% multiplier per level."
         UpgradeId.FRENZY_BOOST -> "Frenzy +0.5 s and +0.25x per level."
         UpgradeId.CRITICAL_BOOST -> "Bigger PERFECT center, +15% bonus per level."
@@ -245,7 +247,7 @@ object EnStrings : Strings() {
     override val avatar = "AVATAR"
     override val editName = "Edit name"
     override val statTotalTaps = "Total TAPs"
-    override val statBestScore = "Best match"
+    override val statBestScore = "Classic record"
     override val statMaxCombo = "Highest combo"
     override val statMaxTps = "Max TAP/s"
     override val statAvgTps = "Average TAP/s"
@@ -375,4 +377,40 @@ object EnStrings : Strings() {
     }
     override val throwItem = "THROW"
     override val noItem = "NO ITEM"
+
+    override val missionComplete = "MISSION COMPLETE!"
+    override fun bossName(kind: BossKind) = when (kind) {
+        BossKind.FURIOSO -> "THE FURIOUS FINGER"
+        BossKind.PUNHO -> "IRON FIST"
+        BossKind.CRONOMETRO -> "THE STOPWATCH"
+        BossKind.GLITCH -> "GLITCH"
+        BossKind.REI -> "NERVOUS KING"
+    }
+    override fun bossObjective(kind: BossKind) = "Beat ${bossName(kind)}"
+    override val bossIncoming = "NERVOUS BOSS"
+    override fun bossAttack(attack: BossAttack) = when (attack) {
+        BossAttack.SHIELD -> "SHIELD!"
+        BossAttack.CHARGE -> "CHARGE!"
+        BossAttack.BLACKOUT -> "BLACKOUT!"
+        BossAttack.CLOCK -> "-${GameBalance.BOSS_CLOCK_MS / 1000} s!"
+        BossAttack.TELEPORT -> "TELEPORT!"
+    }
+    override fun bossRage(rage: Int) = if (rage >= 2) "MAX RAGE!" else "RAGE!"
+    override val bossBlocked = "BLOCKED"
+    override val bossDefeated = "BOSS DEFEATED!"
+    override val timeLabel = "TIME"
+    override val precisionLabel = "ACCURACY"
+    override val reflexLabel = "REFLEX"
+    override val avgMaxLabel = "TAP/s AVG · MAX"
+    override fun starTime(stars: Int, time: String) = "${"★".repeat(stars)} under $time"
+    override val survivalGrade = "No error ★★★ · 1 error ★★"
+    override val errorsPenalty = "+2 s per STOP error"
+    override val arena = "ARENA"
+    override val arenaIntro = "60 seconds for points, no upgrades. The same arena for everyone all week: it is what counts in the rankings."
+    override fun arenaLocked(stage: Int) = "Beat the stage $stage boss to unlock the Arena"
+    override val arenaRecord = "ARENA RECORD"
+    override val arenaWeek = "THIS WEEK'S ARENA"
+    override fun topPercent(percent: Int) = "TOP $percent% THIS WEEK"
+    override val statArenaBest = "Arena record"
+    override val noArenaResults = "No results yet.\nPlay the Arena to show up here!"
 }

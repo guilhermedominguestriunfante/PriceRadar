@@ -1,6 +1,6 @@
 package com.dedonervoso.core.progression
 
-/** One ranked result (spec §22). */
+/** One ranked result (spec §22): an Arena match. */
 class RankEntry(
     val score: Long,
     val stage: Int,
