@@ -11,6 +11,7 @@ enum class Icon {
     COIN, STAR, STAR_OUTLINE, GEAR, TROPHY, USER, BOLT, HEART, HEART_EMPTY, SHIELD, PAUSE, PLAY, HOME,
     RETRY, NEXT, BACK, CLOSE, LOCK, CHECK, LINKEDIN, TARGET, FLAME, CLOCK, CROWN, SKULL, MUSIC, SOUND,
     VIBRATION, SPARKLE, GLOBE, TRASH, INFO, PODIUM, MEDAL, LIST, CALENDAR, UP, GRID, COMBO, HAND, DOWNLOAD,
+    BAG, MAIL, PLUS,
 }
 
 /**
@@ -276,6 +277,28 @@ class Icons {
                     c.drawCircle(-0.32f, y, 0.07f, fill)
                     c.drawRoundRect(-0.18f, y - 0.05f, 0.42f, y + 0.05f, 0.04f, 0.04f, fill)
                 }
+            }
+            Icon.BAG -> {
+                c.drawPath(path(icon) {
+                    moveTo(-0.36f, -0.16f); lineTo(0.36f, -0.16f); lineTo(0.3f, 0.44f); lineTo(-0.3f, 0.44f); close()
+                }, fill)
+                stroke.strokeWidth = 0.08f
+                oval.set(-0.2f, -0.46f, 0.2f, -0.02f)
+                c.drawArc(oval, 180f, 180f, false, stroke)
+                fill.color = Palette.withAlpha(accent, 150)
+                c.drawCircle(-0.16f, 0.02f, 0.05f, fill)
+                c.drawCircle(0.16f, 0.02f, 0.05f, fill)
+            }
+            Icon.MAIL -> {
+                c.drawRoundRect(-0.44f, -0.3f, 0.44f, 0.3f, 0.07f, 0.07f, fill)
+                stroke.color = accent
+                stroke.strokeWidth = 0.07f
+                c.drawPath(path(icon) { moveTo(-0.38f, -0.22f); lineTo(0f, 0.06f); lineTo(0.38f, -0.22f) }, stroke)
+            }
+            Icon.PLUS -> {
+                stroke.strokeWidth = 0.13f
+                c.drawLine(0f, -0.32f, 0f, 0.32f, stroke)
+                c.drawLine(-0.32f, 0f, 0.32f, 0f, stroke)
             }
             Icon.CALENDAR -> {
                 stroke.strokeWidth = 0.08f

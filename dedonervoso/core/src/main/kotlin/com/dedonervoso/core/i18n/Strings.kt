@@ -288,6 +288,16 @@ abstract class Strings {
     abstract val statArenaBest: String
     abstract val noArenaResults: String
 
+    // Lobby (1.3.1).
+    abstract val shop: String
+    abstract val nextBoss: String
+    abstract fun reachStage(stage: Int): String
+    abstract fun dailyBackIn(time: String): String
+    abstract val missionReady: String
+    abstract val duelNeedsOnline: String
+    abstract val playOnline: String
+    abstract val letsGo: String
+
     /** 34200 ms → "34,2 s" (pt) / "34.2 s" (en). */
     fun seconds(ms: Long): String = "${dec1(ms / 1000f)} s"
 

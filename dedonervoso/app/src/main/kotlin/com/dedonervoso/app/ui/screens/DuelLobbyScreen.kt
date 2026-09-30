@@ -75,7 +75,8 @@ class DuelLobbyScreen(app: GameApp) : Screen(app) {
             } else {
                 load = Load.LOADED
                 friends = list.filter { !it.isMe }
-                bestTexts = friends.map { "${s.bestLabel} ${s.num(it.score)}" }
+                // Arena best once they have one; until then how far they got in the campaign.
+                bestTexts = friends.map { if (it.score > 0) "${s.arena} ${s.num(it.score)}" else "${s.stage} ${it.stage}" }
             }
             relayout()
         }

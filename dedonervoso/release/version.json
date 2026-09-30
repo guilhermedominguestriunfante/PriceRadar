@@ -1,25 +1,25 @@
 {
     "schema": 1,
     "app": "com.dedonervoso.app",
-    "versionCode": 5,
-    "versionName": "1.3.0",
+    "versionCode": 6,
+    "versionName": "1.3.1",
     "minOnlineVersionCode": 5,
     "apkUrl": "https://raw.githubusercontent.com/guilhermedominguestriunfante/PriceRadar/main/dedonervoso/release/dedo-nervoso.apk",
-    "size": 4085721,
-    "sha256": "0e06ac4a64d570f9af006e17405a63875b0bd57b34603869f00e6ab19d96dde9",
-    "publishedAt": "2026-09-29",
+    "size": 4200761,
+    "sha256": "fab6ccce79be03459f10c27eabd1d27648dc7845645429f2006344f302753cdf",
+    "publishedAt": "2026-09-30",
     "notes": {
         "pt": [
-            "As fases acabam assim que voc\u00ea cumpre a miss\u00e3o, e as estrelas v\u00eam do seu tempo",
-            "Bosses de verdade a cada 10 fases: barra de vida, ataques, f\u00faria e explos\u00e3o final",
-            "ARENA da semana: 60 s iguais para todos e sem upgrades. \u00c9 ela que vale no ranking",
-            "Nova abertura, novo \u00edcone e o mascote Dedo Nervoso na tela inicial"
+            "Tela inicial nova: o mascote no centro, JOGAR dourado, Arena, miss\u00f5es e amigos \u00e0 m\u00e3o",
+            "Cart\u00f5es do desafio do dia e do pr\u00f3ximo boss, com contagem e a ilustra\u00e7\u00e3o do boss",
+            "Gaveta de amigos: desafie para um duelo direto da tela inicial",
+            "Visual novo em todas as telas: fontes, bot\u00f5es dourados e pain\u00e9is de vidro"
         ],
         "en": [
-            "Stages end the moment you complete the mission, and your time earns the stars",
-            "Real bosses every 10 stages: health bar, attacks, rage and a final explosion",
-            "This week's ARENA: the same 60 s for everyone, no upgrades. It is what the rankings count",
-            "New opening, new icon and the Dedo Nervoso mascot on the home screen"
+            "New home screen: the mascot in the middle, a gold PLAY, the Arena, missions and friends at hand",
+            "Cards for today's challenge and the next boss, with a countdown and the boss's artwork",
+            "Friends drawer: challenge a friend to a duel straight from the home screen",
+            "A new look on every screen: fonts, gold buttons and glass panels"
         ]
     }
 }
