@@ -1,6 +1,7 @@
 package com.dedonervoso.app.ui
 
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -34,11 +35,18 @@ class Neon(private val dp: Float) {
         return gradients.getOrPut(key) { LinearGradient(0f, 0f, 1f, 0f, a, b, Shader.TileMode.CLAMP) }
     }
 
-    /** Rounded panel: translucent fill plus a glowing outline in [strokeColor]. */
+    /**
+     * Panel: a chamfered glass panel (see [glassPanel]) in [strokeColor]. Pill shapes (radius of
+     * half the height or more: toggles, chips) stay rounded, with a softer glow.
+     */
     fun panel(c: Canvas, r: RectF, radius: Float, fillColor: Int, strokeColor: Int, glow: Float = 1f, strokeW: Float = 1.5f * dp) {
-        fill.color = fillColor
-        c.drawRoundRect(r, radius, radius, fill)
-        glowStroke(c, r, radius, strokeColor, glow, strokeW)
+        if (radius * 2f >= minOf(r.width(), r.height()) * 0.95f) {
+            fill.color = fillColor
+            c.drawRoundRect(r, radius, radius, fill)
+            glowStroke(c, r, radius, strokeColor, glow * 0.6f, strokeW)
+            return
+        }
+        glassPanel(c, r, minOf(radius * 0.9f, 14f * dp), fillColor, strokeColor, glow * 0.6f, strokeW)
     }
 
     fun glowStroke(c: Canvas, r: RectF, radius: Float, color: Int, glow: Float = 1f, strokeW: Float = 1.5f * dp) {
@@ -177,5 +185,191 @@ class Neon(private val dp: Float) {
         stroke.color = color
         stroke.strokeWidth = width
         c.drawLine(x0, y0, x1, y1, stroke)
+    }
+
+    // ---- street-lobby pieces (1.3.1): chamfered glass, gold plates, hexagons -------------------
+
+    private val vGradients = HashMap<Long, LinearGradient>()
+
+    /** Vertical gradient fill for the next shape drawn with the returned paint, mapped onto [r]. */
+    fun vertical(r: RectF, top: Int, bottom: Int, alpha: Int = 255): Paint {
+        val key = (top.toLong() shl 32) xor (bottom.toLong() and 0xFFFFFFFFL)
+        val g = vGradients.getOrPut(key) { LinearGradient(0f, 0f, 0f, 1f, top, bottom, Shader.TileMode.CLAMP) }
+        matrix.setScale(1f, r.height())
+        matrix.postTranslate(0f, r.top)
+        g.setLocalMatrix(matrix)
+        gradientPaint.shader = g
+        gradientPaint.alpha = alpha
+        return gradientPaint
+    }
+
+    /** Horizontal gradient fill for the next shape drawn with the returned paint, mapped onto [r]. */
+    fun horizontal(r: RectF, left: Int, right: Int, alpha: Int = 255): Paint {
+        val g = gradient(left, right)
+        matrix.setScale(r.width(), 1f)
+        matrix.postTranslate(r.left, 0f)
+        g.setLocalMatrix(matrix)
+        gradientPaint.shader = g
+        gradientPaint.alpha = alpha
+        return gradientPaint
+    }
+
+    /** Drops the shader left on the shared gradient paint by [vertical]/[horizontal]. */
+    fun clearGradient() {
+        gradientPaint.shader = null
+    }
+
+    private val gold3 = intArrayOf(Palette.GOLD_HI, Palette.GOLD, 0xFFF2A51E.toInt(), Palette.GOLD_DEEP)
+    private val gold3Stops = floatArrayOf(0f, 0.32f, 0.62f, 1f)
+    private val goldShader = LinearGradient(0f, 0f, 0f, 1f, gold3, gold3Stops, Shader.TileMode.CLAMP)
+
+    /** Rect with its top-left and bottom-right corners cut by [cut] (the lobby's panel shape). */
+    fun chamfer(r: RectF, cut: Float): Path {
+        val k = minOf(cut, r.width() / 2f, r.height() / 2f)
+        path.reset()
+        path.moveTo(r.left + k, r.top)
+        path.lineTo(r.right, r.top)
+        path.lineTo(r.right, r.bottom - k)
+        path.lineTo(r.right - k, r.bottom)
+        path.lineTo(r.left, r.bottom)
+        path.lineTo(r.left, r.top + k)
+        path.close()
+        return path
+    }
+
+    /**
+     * Chamfered glass panel: [fillColor] inside, a faint [edgeColor] outline and bright corner
+     * accents on the two cut corners. The shared panel look of every menu.
+     */
+    fun glassPanel(c: Canvas, r: RectF, cut: Float, fillColor: Int, edgeColor: Int, glow: Float = 0.6f, strokeW: Float = 1.5f * dp) {
+        val p = chamfer(r, cut)
+        fill.color = fillColor
+        c.drawPath(p, fill)
+        // A soft sheen on the upper half.
+        rect.set(r.left, r.top, r.right, r.top + r.height() * 0.5f)
+        c.save()
+        c.clipPath(p)
+        c.drawRect(rect, vertical(rect, 0x14FFFFFF, 0x00FFFFFF))
+        gradientPaint.shader = null
+        c.restore()
+        if (glow > 0f) {
+            stroke.color = Palette.withAlpha(edgeColor, (40 * glow).toInt())
+            stroke.strokeWidth = strokeW + 5f * dp * glow
+            c.drawPath(p, stroke)
+        }
+        stroke.color = Palette.withAlpha(edgeColor, (Color.alpha(edgeColor) * 0.5f).toInt())
+        stroke.strokeWidth = strokeW
+        c.drawPath(p, stroke)
+        // Corner accents: the cut corners and a stretch of the edges next to them, at full colour.
+        val k = minOf(cut, r.width() / 2f, r.height() / 2f)
+        val arm = minOf(r.width(), r.height()) * 0.35f
+        stroke.color = edgeColor
+        stroke.strokeWidth = strokeW * 1.6f
+        c.drawLine(r.left, r.top + k + arm, r.left, r.top + k, stroke)
+        c.drawLine(r.left, r.top + k, r.left + k, r.top, stroke)
+        c.drawLine(r.left + k, r.top, r.left + k + arm, r.top, stroke)
+        c.drawLine(r.right, r.bottom - k - arm, r.right, r.bottom - k, stroke)
+        c.drawLine(r.right, r.bottom - k, r.right - k, r.bottom, stroke)
+        c.drawLine(r.right - k, r.bottom, r.right - k - arm, r.bottom, stroke)
+    }
+
+    /**
+     * The lobby's gold call-to-action plate: a slanted plate (left edge leaning by [slant] of
+     * its width) with a molten gradient, a top highlight and a light sweep at [shine] (0..1,
+     * negative = none).
+     */
+    fun goldPlate(c: Canvas, r: RectF, slant: Float, shine: Float, alpha: Float = 1f) {
+        val lean = r.width() * slant
+        path.reset()
+        path.moveTo(r.left + lean, r.top)
+        path.lineTo(r.right, r.top)
+        path.lineTo(r.right, r.bottom)
+        path.lineTo(r.left, r.bottom)
+        path.close()
+        glowBlob(c, r.centerX(), r.centerY() + r.height() * 0.2f, r.width() * 0.6f, Palette.ORANGE, 0.35f * alpha)
+        matrix.setScale(1f, r.height())
+        matrix.postTranslate(0f, r.top)
+        goldShader.setLocalMatrix(matrix)
+        gradientPaint.shader = goldShader
+        gradientPaint.alpha = (255 * alpha).toInt()
+        c.drawPath(path, gradientPaint)
+        gradientPaint.shader = null
+        c.save()
+        c.clipPath(path)
+        // Glassy top highlight.
+        rect.set(r.left, r.top, r.right, r.top + r.height() * 0.45f)
+        c.drawRect(rect, vertical(rect, Palette.withAlpha(Palette.WHITE, 0.45f * alpha), 0x00FFFFFF))
+        gradientPaint.shader = null
+        // The light sweep.
+        if (shine in 0f..1f) {
+            val x = r.left - r.width() * 0.3f + r.width() * 1.6f * shine
+            stroke.color = Palette.withAlpha(Palette.WHITE, 0.5f * alpha)
+            stroke.strokeWidth = r.width() * 0.12f
+            c.drawLine(x, r.bottom + r.height() * 0.2f, x + r.height() * 0.5f, r.top - r.height() * 0.2f, stroke)
+        }
+        c.restore()
+        stroke.color = Palette.withAlpha(Palette.GOLD_DEEP, alpha)
+        stroke.strokeWidth = 1.5f * dp
+        c.drawPath(path, stroke)
+    }
+
+    /** Pointy-top hexagon with a metal rim ([rim] gradient) around a dark core (the ARENA emblem). */
+    fun hexEmblem(c: Canvas, cx: Float, cy: Float, radius: Float, rimTop: Int, rimBottom: Int, core: Int) {
+        hexPath(cx, cy, radius)
+        rect.set(cx - radius, cy - radius, cx + radius, cy + radius)
+        c.drawPath(path, vertical(rect, rimTop, rimBottom))
+        gradientPaint.shader = null
+        hexPath(cx, cy, radius * 0.88f)
+        fill.color = core
+        c.drawPath(path, fill)
+    }
+
+    private fun hexPath(cx: Float, cy: Float, radius: Float) {
+        path.reset()
+        for (i in 0 until 6) {
+            val a = Math.toRadians((-90 + i * 60).toDouble())
+            val x = cx + (radius * Math.cos(a)).toFloat()
+            val y = cy + (radius * Math.sin(a)).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+    }
+
+    /** Octagon outline path (avatar frames), left in the shared scratch path for clipping. */
+    fun octagonPath(cx: Float, cy: Float, half: Float): Path {
+        val k = half * 0.44f
+        path.reset()
+        path.moveTo(cx - half + k, cy - half)
+        path.lineTo(cx + half - k, cy - half)
+        path.lineTo(cx + half, cy - half + k)
+        path.lineTo(cx + half, cy + half - k)
+        path.lineTo(cx + half - k, cy + half)
+        path.lineTo(cx - half + k, cy + half)
+        path.lineTo(cx - half, cy + half - k)
+        path.lineTo(cx - half, cy - half + k)
+        path.close()
+        return path
+    }
+
+    /** Gold octagon frame around whatever [content] draws (clipped to the inner octagon). */
+    inline fun goldFrame(c: Canvas, cx: Float, cy: Float, half: Float, content: () -> Unit) {
+        val border = maxOf(2f * dpValue, half * 0.1f)
+        framePaintFor(cy, half)
+        c.drawPath(octagonPath(cx, cy, half), framePaint)
+        framePaint.shader = null
+        c.save()
+        c.clipPath(octagonPath(cx, cy, half - border))
+        content()
+        c.restore()
+    }
+
+    @PublishedApi internal val framePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    @PublishedApi internal val dpValue: Float get() = dp
+
+    @PublishedApi internal fun framePaintFor(cy: Float, half: Float) {
+        matrix.setScale(1f, half * 2f)
+        matrix.postTranslate(0f, cy - half)
+        goldShader.setLocalMatrix(matrix)
+        framePaint.shader = goldShader
     }
 }

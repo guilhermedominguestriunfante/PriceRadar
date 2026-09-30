@@ -44,6 +44,10 @@ class UiKit(context: Context) {
     val textPaint = textPaint(fonts.text, 20f, Palette.TEXT, Paint.Align.CENTER, 0.03f)
     val semiPaint = textPaint(fonts.textSemi, 20f, Palette.TEXT, Paint.Align.LEFT, 0.02f)
     val mediumPaint = textPaint(fonts.textMedium, 20f, Palette.DIM, Paint.Align.LEFT, 0.02f)
+    /** The wordmark's own face (the original display font). */
+    val brandPaint = textPaint(fonts.brand, 20f, Palette.WHITE, Paint.Align.CENTER)
+    /** Graffiti accents. */
+    val tagPaint = textPaint(fonts.tag, 20f, Palette.RED, Paint.Align.CENTER)
 
     /** Wordmark and glove-hand mark (Home logo, opening). */
     val brand = Brand(this)
@@ -138,7 +142,8 @@ class Button(
     var accent: Int = Palette.CYAN,
     var onClick: () -> Unit = {},
 ) {
-    enum class Style { PRIMARY, SECONDARY, ICON, GHOST, DANGER, TILE, LINK }
+    /** HIDDEN: a touch area only; the screen draws it (the lobby's custom pieces). */
+    enum class Style { PRIMARY, SECONDARY, ICON, GHOST, DANGER, TILE, LINK, HIDDEN }
 
     val rect = RectF()
     var enabled = true
@@ -252,22 +257,21 @@ class ButtonRenderer(private val ui: UiKit) {
         val alpha = if (b.enabled) 1f else 0.4f
         when (b.style) {
             Button.Style.PRIMARY -> {
-                val radius = r.height() / 2f
-                neon.glowBlob(c, cx, cy, r.width() * 0.62f, b.accent, 0.28f * alpha + 0.2f * press)
-                neon.gradientRect(c, r, radius, Palette.mix(b.accent, Palette.WHITE, 0.08f + 0.2f * press), Palette.mix(b.accent, Palette.PURPLE, 0.55f), (255 * alpha).toInt())
-                neon.glowStroke(c, r, radius, Palette.withAlpha(Palette.WHITE, 0.85f * alpha), 0.8f, 1.6f * u)
-                // Dark label on the bright neon fill: maximum contrast for the main call to action.
-                val p = ui.style(ui.displayPaint, 22f, Palette.withAlpha(Palette.BG_TOP, alpha), Paint.Align.CENTER)
-                p.setShadowLayer(6f * u, 0f, 0f, Palette.withAlpha(Palette.WHITE, 0.55f * alpha))
+                // The molten gold plate of the lobby, with a light sweep every few seconds.
+                val sweep = (ui.time % SHINE_PERIOD) / SHINE_PERIOD
+                val shine = if (b.enabled && sweep > 0.6f) (sweep - 0.6f) / 0.4f else -1f
+                neon.goldPlate(c, r, 0.04f, shine, alpha)
+                val p = ui.style(ui.displayPaint, 21f, Palette.withAlpha(Palette.ON_GOLD, alpha), Paint.Align.CENTER)
+                p.setShadowLayer(2f * u, 0f, 1f * u, Palette.withAlpha(Palette.WHITE, 0.5f * alpha))
                 ui.fitText(c, b.label, cx, cy + p.textSize * 0.36f, p, r.width() * 0.84f)
                 p.clearShadowLayer()
             }
             Button.Style.SECONDARY, Button.Style.DANGER -> {
                 val radius = minOf(r.height() / 2f, 16f * u)
                 val accent = if (b.style == Button.Style.DANGER) Palette.RED else b.accent
-                neon.panel(c, r, radius, Palette.withAlpha(Palette.mix(Palette.PANEL, accent, 0.08f + 0.18f * press), 0.92f * alpha), Palette.withAlpha(accent, 0.9f * alpha), 0.7f + press)
+                neon.panel(c, r, radius, Palette.withAlpha(Palette.mix(Palette.GLASS, accent, 0.06f + 0.18f * press), 0.95f * alpha), Palette.withAlpha(accent, 0.9f * alpha), 0.7f + press)
                 val icon = b.icon
-                val label = ui.style(ui.textPaint, 16f, Palette.withAlpha(Palette.WHITE, alpha), Paint.Align.CENTER)
+                val label = ui.style(ui.textPaint, 16f, Palette.withAlpha(Palette.PAPER, alpha), Paint.Align.CENTER)
                 if (icon != null && b.label.isNotEmpty()) {
                     val iconSize = minOf(r.height() * 0.46f, 24f * u)
                     if (r.width() > r.height() * 1.8f) {
@@ -290,11 +294,12 @@ class ButtonRenderer(private val ui: UiKit) {
                 }
             }
             Button.Style.ICON -> {
+                // A dark medallion with a thin ring.
                 val radius = minOf(r.width(), r.height()) / 2f
-                neon.circle(c, cx, cy, radius, Palette.withAlpha(Palette.mix(Palette.PANEL, b.accent, 0.12f + 0.25f * press), 0.9f * alpha))
-                neon.circleStroke(c, cx, cy, radius, Palette.withAlpha(b.accent, 0.35f * alpha), 5f * u)
-                neon.circleStroke(c, cx, cy, radius, Palette.withAlpha(b.accent, 0.9f * alpha), 1.5f * u)
-                b.icon?.let { ui.icons.draw(c, it, cx, cy, radius * 0.95f, Palette.withAlpha(b.accent, alpha)) }
+                neon.circle(c, cx, cy, radius, Palette.withAlpha(Palette.mix(Palette.INK, b.accent, 0.08f + 0.25f * press), 0.92f * alpha))
+                neon.circleStroke(c, cx, cy, radius - 3f * u, Palette.withAlpha(Palette.WHITE, 0.06f * alpha), 1f * u)
+                neon.circleStroke(c, cx, cy, radius, Palette.withAlpha(b.accent, 0.85f * alpha), 1.5f * u)
+                b.icon?.let { ui.icons.draw(c, it, cx, cy, radius * 0.9f, Palette.withAlpha(b.accent, alpha)) }
             }
             Button.Style.GHOST -> {
                 val p = ui.style(ui.textPaint, 15f, Palette.withAlpha(if (press > 0.3f) Palette.WHITE else Palette.DIM, alpha), Paint.Align.CENTER)
@@ -302,11 +307,17 @@ class ButtonRenderer(private val ui: UiKit) {
             }
             Button.Style.TILE -> {
                 val radius = 14f * u
-                neon.panel(c, r, radius, Palette.withAlpha(Palette.mix(Palette.PANEL, b.accent, 0.1f + 0.2f * press), 0.9f * alpha), Palette.withAlpha(b.accent, 0.75f * alpha), 0.5f + press)
-                b.icon?.let { ui.icons.draw(c, it, cx, r.top + r.height() * 0.38f, r.height() * 0.34f, Palette.withAlpha(b.accent, alpha)) }
-                val p = ui.style(ui.textPaint, 12.5f, Palette.withAlpha(Palette.WHITE, alpha), Paint.Align.CENTER)
+                neon.panel(c, r, radius, Palette.withAlpha(Palette.mix(Palette.GLASS, b.accent, 0.08f + 0.2f * press), 0.95f * alpha), Palette.withAlpha(b.accent, 0.75f * alpha), 0.5f + press)
+                b.icon?.let {
+                    val iy = r.top + r.height() * 0.38f
+                    neon.circle(c, cx, iy, r.height() * 0.26f, Palette.withAlpha(Palette.INK, 0.8f * alpha))
+                    neon.circleStroke(c, cx, iy, r.height() * 0.26f, Palette.withAlpha(b.accent, 0.4f * alpha), 1f * u)
+                    ui.icons.draw(c, it, cx, iy, r.height() * 0.3f, Palette.withAlpha(b.accent, alpha))
+                }
+                val p = ui.style(ui.textPaint, 12.5f, Palette.withAlpha(Palette.PAPER, alpha), Paint.Align.CENTER)
                 ui.fitText(c, b.label, cx, r.bottom - r.height() * 0.16f, p, r.width() - 6f * u)
             }
+            Button.Style.HIDDEN -> Unit
             Button.Style.LINK -> {
                 val radius = r.height() / 2f
                 neon.panel(c, r, radius, Palette.withAlpha(Palette.mix(Palette.PANEL, b.accent, 0.15f + 0.2f * press), 0.9f), Palette.withAlpha(b.accent, 0.85f), 0.6f + press)
@@ -324,14 +335,40 @@ class ButtonRenderer(private val ui: UiKit) {
                 }
             }
         }
-        b.badge?.let { badge ->
-            val bx = r.right - 6f * u
-            val by = r.top + 6f * u
-            val br = 9f * u
-            neon.circle(c, bx, by, br, Palette.RED)
-            val p = ui.style(ui.textPaint, 11f, Palette.WHITE, Paint.Align.CENTER)
-            c.drawText(badge, bx, by + p.textSize * 0.36f, p)
-        }
+        if (b.style != Button.Style.HIDDEN) b.badge?.let { badge(c, it, r.right - 6f * u, r.top + 6f * u) }
+    }
+
+    /** Red count badge ("3", "!") with a dark outline, centred at ([x], [y]). */
+    fun badge(c: Canvas, text: String, x: Float, y: Float) {
+        val u = ui.u
+        val p = ui.style(ui.textPaint, 11f, Palette.WHITE, Paint.Align.CENTER)
+        val w = maxOf(18f * u, p.measureText(text) + 10f * u)
+        val fill = ui.neon.fill
+        r.set(x - w / 2f - 2f * u, y - 11f * u, x + w / 2f + 2f * u, y + 11f * u)
+        fill.color = Palette.INK
+        c.drawRoundRect(r, 11f * u, 11f * u, fill)
+        r.set(x - w / 2f, y - 9f * u, x + w / 2f, y + 9f * u)
+        fill.color = Palette.RED
+        c.drawRoundRect(r, 9f * u, 9f * u, fill)
+        c.drawText(text, x, y + p.textSize * 0.36f, p)
+    }
+
+    /** Red "NEW" tag, slightly tilted, centred at ([x], [y]). */
+    fun newTag(c: Canvas, text: String, x: Float, y: Float) {
+        val u = ui.u
+        val p = ui.style(ui.displayPaint, 8.5f, Palette.WHITE, Paint.Align.CENTER)
+        val w = p.measureText(text) + 8f * u
+        c.save()
+        c.rotate(-6f, x, y)
+        r.set(x - w / 2f, y - 7f * u, x + w / 2f, y + 7f * u)
+        ui.neon.fill.color = Palette.RED
+        c.drawRoundRect(r, 3f * u, 3f * u, ui.neon.fill)
+        c.drawText(text, x, y + p.textSize * 0.38f, p)
+        c.restore()
+    }
+
+    private companion object {
+        const val SHINE_PERIOD = 3.4f
     }
 
     /** On/off switch drawn at the right side of [row]. */

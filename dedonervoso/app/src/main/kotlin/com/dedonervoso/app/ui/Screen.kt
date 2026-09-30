@@ -157,7 +157,7 @@ abstract class Screen(protected val app: GameApp) {
         title: String, icon: Icon? = null, rightReserve: Float = 0f, onBack: () -> Unit = { app.host.pop() },
     ): Float {
         val size = 44f * u
-        val back = button("", Icon.BACK, Button.Style.ICON, Palette.CYAN, onBack)
+        val back = button("", Icon.BACK, Button.Style.ICON, Palette.GOLD, onBack)
         back.rect.set(safe.left, safe.top, safe.left + size, safe.top + size)
         back.backSound = true
         headerTitle = title
@@ -171,12 +171,21 @@ abstract class Screen(protected val app: GameApp) {
     private var headerMaxWidth = 0f
 
     protected fun drawHeader(c: Canvas) {
-        val p = ui.style(ui.displayPaint, 22f, Palette.WHITE, Paint.Align.CENTER)
+        val p = ui.style(ui.displayPaint, 21f, Palette.PAPER, Paint.Align.CENTER)
         val y = safe.top + 22f * u + p.textSize * 0.36f
         val w = p.measureText(headerTitle)
         if (headerMaxWidth > 0f && w > headerMaxWidth) p.textSize *= headerMaxWidth / w
-        ui.neon.glowText(c, headerTitle, width / 2f, y, p, Palette.withAlpha(Palette.CYAN, 0.8f), 10f * u)
+        ui.neon.glowText(c, headerTitle, width / 2f, y, p, Palette.withAlpha(Palette.EMBER, 0.7f), 10f * u)
+        // A gold hairline under the title, fading at both ends.
+        val half = minOf(p.measureText(headerTitle), headerMaxWidth) / 2f + 18f * u
+        headerLine.set(width / 2f - half, y + 8f * u, width / 2f, y + 9.5f * u)
+        c.drawRect(headerLine, ui.neon.horizontal(headerLine, 0x00FFC53D, Palette.GOLD))
+        headerLine.set(width / 2f, y + 8f * u, width / 2f + half, y + 9.5f * u)
+        c.drawRect(headerLine, ui.neon.horizontal(headerLine, Palette.GOLD, 0x00FFC53D))
+        ui.neon.clearGradient()
     }
+
+    private val headerLine = RectF()
 
     /**
      * Menu background: the mascot scene blurred and darkened, drifting slowly (the neon grid when

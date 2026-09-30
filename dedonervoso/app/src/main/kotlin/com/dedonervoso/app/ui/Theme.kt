@@ -26,6 +26,18 @@ object Palette {
     const val PANEL_LIGHT = 0xE6141B45.toInt()
     const val SHADOW = 0xAA000000.toInt()
 
+    // Street lobby (1.3.1): molten gold, embers and dark glass over the mascot art.
+    const val GOLD_HI = 0xFFFFF0B3.toInt()
+    const val GOLD_DEEP = 0xFF9A5516.toInt()
+    const val EMBER = 0xFFFF5A1F.toInt()
+    const val PAPER = 0xFFF6EDE0.toInt()
+    const val SAND = 0xFFBBA99D.toInt()
+    const val INK = 0xFF0C0810.toInt()
+    const val GLASS = 0xC7180F1A.toInt()
+    const val GLASS_EDGE = 0x57FFC53D
+    /** Dark brown text on gold. */
+    const val ON_GOLD = 0xFF2E1504.toInt()
+
     /** Sprite palette for particles/glows (indices used by the FX systems). */
     val SPRITES = intArrayOf(WHITE, CYAN, MAGENTA, GOLD, RED, GREEN, PURPLE, ORANGE, BLUE)
     const val S_WHITE = 0
@@ -65,9 +77,13 @@ object Palette {
 
 /** Typefaces bundled in assets/fonts (see assets/licenses). */
 class Fonts(assets: AssetManager) {
-    /** Futuristic display face for logos, numbers and big words. */
-    val display: Typeface = load(assets, "fonts/display_black.ttf", Typeface.DEFAULT_BOLD)
-    val displayBold: Typeface = load(assets, "fonts/display_bold.ttf", Typeface.DEFAULT_BOLD)
+    /** Blocky street-sign display face (Bungee) for titles, numbers and big words. */
+    val display: Typeface = load(assets, "fonts/bungee.ttf", Typeface.DEFAULT_BOLD)
+    val displayBold: Typeface = display
+    /** The original "Nervoso Display" face: the DEDO NERVOSO wordmark only. */
+    val brand: Typeface = load(assets, "fonts/display_black.ttf", Typeface.DEFAULT_BOLD)
+    /** Graffiti marker for small accents ("bora!"). */
+    val tag: Typeface = load(assets, "fonts/permanent_marker.ttf", Typeface.DEFAULT_BOLD)
     /** Condensed techy face for labels and body text. */
     val text: Typeface = load(assets, "fonts/rajdhani_bold.ttf", Typeface.DEFAULT_BOLD)
     val textSemi: Typeface = load(assets, "fonts/rajdhani_semibold.ttf", Typeface.DEFAULT)

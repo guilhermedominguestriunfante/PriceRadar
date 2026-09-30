@@ -258,6 +258,11 @@ class GameFlowTest {
     @Test
     fun developerButtonOpensLinkedIn() {
         val h = GameHarness().launch(GameHarness.progressedSave())
+        // Since the lobby (1.3.1) the link lives in Settings → About, at the end of the list.
+        h.click(h.buttons().first { it.icon == com.dedonervoso.app.ui.Icon.GEAR }, 60)
+        val scroll = h.app.host.current!!.scrollsForTest.single()
+        scroll.scrollTo(scroll.maxOffset)
+        h.frames(5)
         h.click(h.app.strings.developer, 10)
         val intent = shadowOf(h.activity).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, intent.action)

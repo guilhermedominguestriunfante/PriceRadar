@@ -49,7 +49,7 @@ class Brand(private val ui: UiKit) {
      * for reduced effects) and [alpha] fades it. Returns line 2's baseline.
      */
     fun wordmark(c: Canvas, cx: Float, y1: Float, size: Float, maxWidth: Float, alpha: Float, time: Float, shake: Float): Float {
-        val p = ui.displayPaint
+        val p = ui.brandPaint
         p.textAlign = Paint.Align.LEFT
         p.textSize = size
         val width1 = measure(p, line1, widths1)

@@ -61,12 +61,20 @@ class Background(private val dp: Float, private val neon: Neon) {
         scroll = (scroll + dt * 0.35f * speed) % 1f
     }
 
+    /** Drawn instead of the sky gradient when set (the dimmed street scene during play). */
+    var backdrop: ((Canvas) -> Unit)? = null
+
     fun draw(c: Canvas) {
-        skyPaint.shader = sky
-        c.drawRect(0f, 0f, w, h, skyPaint)
+        val art = backdrop
+        if (art != null) {
+            art(c)
+        } else {
+            skyPaint.shader = sky
+            c.drawRect(0f, 0f, w, h, skyPaint)
+        }
         val hy = h * horizon
-        // Stars (upper sky only).
-        for (i in 0 until STARS) {
+        // Stars (upper sky only; not over the street scene).
+        if (art == null) for (i in 0 until STARS) {
             val sy = starY[i] * hy * 0.95f
             val tw = 0.35f + 0.65f * (0.5f + 0.5f * sin(time * 1.7f + starPhase[i]))
             starPaint.color = Palette.withAlpha(Palette.WHITE, tw * 0.8f)

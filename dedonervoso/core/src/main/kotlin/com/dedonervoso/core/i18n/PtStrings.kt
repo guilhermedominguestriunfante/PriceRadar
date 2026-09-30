@@ -321,7 +321,7 @@ object PtStrings : Strings() {
     override val you = "VOCÊ"
     override val connecting = "Conectando…"
     override val credits = "Créditos"
-    override val fontsCredit = "Fontes Nervoso Display (derivada da Orbitron) e Rajdhani — SIL Open Font License 1.1"
+    override val fontsCredit = "Fontes Bungee, Nervoso Display (derivada da Orbitron) e Rajdhani — SIL Open Font License 1.1; Permanent Marker — Apache 2.0"
     override val privacyNote = "Sem anúncios. Sem conta. Nenhum dado coletado — seu progresso fica salvo no aparelho."
     override val on = "ON"
     override val off = "OFF"
@@ -378,6 +378,14 @@ object PtStrings : Strings() {
     override val throwItem = "JOGAR"
     override val noItem = "SEM ITEM"
 
+    override val shop = "LOJA"
+    override val nextBoss = "PRÓXIMO BOSS"
+    override fun reachStage(stage: Int) = "Chegue à fase $stage"
+    override fun dailyBackIn(time: String) = "Feito · volta em $time"
+    override val missionReady = "Missão completa! Toque para resgatar"
+    override val duelNeedsOnline = "Ative o ranking online para duelar com amigos"
+    override val playOnline = "Jogue com amigos"
+    override val letsGo = "bora!"
     override val missionComplete = "MISSÃO CUMPRIDA!"
     override fun bossName(kind: BossKind) = when (kind) {
         BossKind.FURIOSO -> "O DEDO FURIOSO"

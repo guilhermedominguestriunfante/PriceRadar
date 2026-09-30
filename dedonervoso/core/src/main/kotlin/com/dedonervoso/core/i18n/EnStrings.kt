@@ -321,7 +321,7 @@ object EnStrings : Strings() {
     override val you = "YOU"
     override val connecting = "Connecting…"
     override val credits = "Credits"
-    override val fontsCredit = "Nervoso Display (derived from Orbitron) and Rajdhani fonts — SIL Open Font License 1.1"
+    override val fontsCredit = "Bungee, Nervoso Display (derived from Orbitron) and Rajdhani fonts — SIL Open Font License 1.1; Permanent Marker — Apache 2.0"
     override val privacyNote = "No ads. No account. No data collected — your progress is saved on this device."
     override val on = "ON"
     override val off = "OFF"
@@ -378,6 +378,14 @@ object EnStrings : Strings() {
     override val throwItem = "THROW"
     override val noItem = "NO ITEM"
 
+    override val shop = "SHOP"
+    override val nextBoss = "NEXT BOSS"
+    override fun reachStage(stage: Int) = "Reach stage $stage"
+    override fun dailyBackIn(time: String) = "Done · back in $time"
+    override val missionReady = "Mission done! Tap to claim"
+    override val duelNeedsOnline = "Turn online ranking on to duel your friends"
+    override val playOnline = "Play with friends"
+    override val letsGo = "let's go!"
     override val missionComplete = "MISSION COMPLETE!"
     override fun bossName(kind: BossKind) = when (kind) {
         BossKind.FURIOSO -> "THE FURIOUS FINGER"

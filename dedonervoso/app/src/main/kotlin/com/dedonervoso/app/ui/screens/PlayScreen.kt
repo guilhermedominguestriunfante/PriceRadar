@@ -992,8 +992,11 @@ class PlayScreen(
         val sess = session
         val bg = ui.background
         bg.horizon = 0.8f
-        bg.gridAlpha = 0.75f
+        bg.gridAlpha = 0.55f
+        // The street scene, dark enough for the zones and the boss to read over it.
+        bg.backdrop = if (ui.art.backdrop != null) sceneBackdrop else null
         bg.draw(c)
+        bg.backdrop = null
         c.save()
         c.translate(shake.offsetX, shake.offsetY)
         if (sess != null) {
@@ -1025,6 +1028,12 @@ class PlayScreen(
             Phase.INTRO -> drawIntro(c)
             else -> Unit
         }
+    }
+
+    private val sceneBackdrop: (Canvas) -> Unit = { c ->
+        ui.art.backdrop?.let { ui.art.drawCover(c, it, width, height, zoom = 1.1f) }
+        overlayPaint.color = 0xB808040A.toInt()
+        c.drawRect(0f, 0f, width, height, overlayPaint)
     }
 
     private fun drawArenaFrame(c: Canvas, sess: GameSession) {

@@ -74,7 +74,7 @@ class BossArt(private val ui: UiKit, private val assets: AssetManager) {
     }
 
     /** Illustration for [kind], loaded once (null when the build ships none). */
-    private fun bitmap(kind: BossKind): Bitmap? = bitmaps.getOrPut(kind) {
+    fun illustration(kind: BossKind): Bitmap? = bitmaps.getOrPut(kind) {
         try {
             Endpoints.openArt(assets, "art/boss_${kind.name.lowercase()}.webp").use { BitmapFactory.decodeStream(it) }
         } catch (e: java.io.IOException) {
@@ -101,7 +101,7 @@ class BossArt(private val ui: UiKit, private val assets: AssetManager) {
         c.translate(cx + tremble, cy)
         if (look.charging) c.scale(1.18f, 0.88f) else c.scale(1f + squash, 1f - squash)
         if (tier > 0) c.scale(1f + 0.04f * tier.coerceAtMost(3), 1f + 0.04f * tier.coerceAtMost(3))
-        val art = bitmap(kind)
+        val art = illustration(kind)
         if (art != null && !look.eyesOnly) {
             drawBitmap(c, art, r, look)
         } else {
@@ -450,7 +450,7 @@ class BossArt(private val ui: UiKit, private val assets: AssetManager) {
         fill.shader = null
         fill.color = 0xFF14060E.toInt()
         c.drawCircle(pcx, pcy, pr, fill)
-        bitmap(kind)?.let { boss ->
+        illustration(kind)?.let { boss ->
             c.save()
             clip.reset()
             clip.addCircle(pcx, pcy, pr, Path.Direction.CW)

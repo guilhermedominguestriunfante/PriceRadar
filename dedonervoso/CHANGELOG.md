@@ -3,6 +3,30 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem
 [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.3.1] — 2026-09-29 · Lobby
+
+Versão 6. Só visual: o formato online não mudou, então a 1.3.0 continua jogando online.
+
+### Tela inicial (lobby)
+- O mascote ocupa a tela e os comandos ficam nas bordas, como no protótipo aprovado:
+  - topo: avatar numa moldura octogonal dourada com o nível, nome e barra de XP, moedas com "+"
+    (loja), convites de duelo (com contador) e configurações;
+  - esquerda: cartão do desafio do dia (recompensa ou contagem para o próximo), cartão do próximo
+    boss com a ilustração dele (toque seleciona a fase quando liberada), loja e conquistas;
+  - direita: gaveta de amigos com recorde da Arena ou fase de cada um e o botão de duelo; sem
+    online, um convite para ativar;
+  - base: a missão mais perto da recompensa num balão, o seletor de fase (estrelas e melhor tempo),
+    o emblema da ARENA, o JOGAR dourado com brilho e o menu (Upgrades, Duelo, Missões, Ranking,
+    Perfil).
+- O link do LinkedIn do desenvolvedor fica em Configurações → Sobre.
+
+### Visual em todas as telas
+- Fontes novas: Bungee nos títulos, botões e números; Permanent Marker no detalhe grafite.
+- Painéis de vidro com cantos cortados e acentos dourados, botão principal como placa dourada com
+  brilho passando, botões redondos com aro, títulos com filete dourado.
+- A partida usa a cena da rua escurecida de fundo, mantendo as cores de STOP e FRENZY.
+- No duelo, amigos sem recorde da Arena mostram a fase em vez de "melhor 0".
+
 ## [1.3.0] — 2026-09-29 · Campanha e Arena
 
 Versão 5. O online passa a exigir esta versão: o ranking agora é da Arena e as regras do servidor

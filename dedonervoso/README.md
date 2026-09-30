@@ -5,7 +5,7 @@ acerte as **Hot Zones**, encha o **FRENZY** e avance por fases infinitas com um 
 Cada fase acaba assim que a missão é cumprida (60 s são o limite) e as estrelas vêm do tempo; a
 **Arena** da semana (60 s iguais para todos, sem upgrades) vale no ranking online com os amigos.
 
-- Pacote: `com.dedonervoso.app` · versão **1.3.0** (versionCode 5)
+- Pacote: `com.dedonervoso.app` · versão **1.3.1** (versionCode 6)
 - Android 8.0+ (minSdk 26) · targetSdk 35 · somente retrato
 - Offline por padrão; online opcional (Firebase). Sem anúncios, sem compras, sem pay-to-win.
 - Idiomas: português e inglês (automático pelo sistema ou escolhido nas configurações).
@@ -73,7 +73,7 @@ Sair do app pausa a partida; ao voltar, há contagem 3-2-1.
   procurar atualização e Sobre.
 - **Identidade**: ícone da luva com o dedo "nervoso", logo DEDO / NERVOSO com tremedeira e
   abertura animada (pula com um toque).
-- **Desenvolvedor**: botão com o LinkedIn do criador na tela inicial e em Sobre
+- **Desenvolvedor**: botão com o LinkedIn do criador em Configurações → Sobre
   ([linkedin.com/in/guilhermekawe](https://www.linkedin.com/in/guilhermekawe/)).
 
 ## Online (opcional)
